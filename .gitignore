@@ -1,0 +1,6 @@
+.hg
+.hgignore
+*.swp
+*.mu
+music-info.xml
+.mypy_cache
