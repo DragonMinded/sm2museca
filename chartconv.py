@@ -16,7 +16,47 @@ class Museca:
         # Parse out BPM
         bpms = Museca.__get_bpms(infodict.get('bpms', ''))
 
-        return b''
+        # Write out the chart
+        chart = minidom.Document()
+        root = chart.createElement('data')
+        chart.appendChild(root)
+
+        def element(parent: Any, name: str, value: Optional[str]=None) -> Any:
+            element = chart.createElement(name)
+            parent.appendChild(element)
+
+            if value is not None:
+                text = chart.createTextNode(value)
+                element.appendChild(text)
+
+            return element
+
+        # Chart info
+        smf_info = element(root, 'smf_info')
+        element(smf_info, 'ticks', '480').setAttribute('__type', 's32')
+
+        tempo_info = element(smf_info, 'tempo_info')
+
+        # Copy down BPM changes
+        for (timedelta, bpm) in bpms:
+            tempo = element(tempo_info, 'tempo')
+            element(tempo, 'time', str(int(timedelta * 100))).setAttribute('__type', 's32')
+            element(tempo, 'delta_time', '0').setAttribute('__type', 's32')
+            element(tempo, 'val', str(int((60.0 / bpm) * 1000000))).setAttribute('__type', 's32')
+            element(tempo, 'bpm', str(int(bpm * 100))).setAttribute('__type', 's64')
+
+        # We don't currently support signature changes, so none of that here
+        sig_info = element(smf_info, 'sig_info')
+        signature = element(sig_info, 'signature')
+        element(signature, 'time', '0').setAttribute('__type', 's32')
+        element(signature, 'delta_time', '0').setAttribute('__type', 's32')
+        element(signature, 'num', '4').setAttribute('__type', 's32')
+        element(signature, 'denomi', '4').setAttribute('__type', 's32')
+
+        # Output parsed events
+
+        # Return the chart
+        return chart.toprettyxml(indent="  ", encoding='shift-jis')
 
     @staticmethod
     def __get_notesections(data: bytes) -> Dict[str, Dict[str, str]]:
