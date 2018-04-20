@@ -147,8 +147,8 @@ class Museca:
         element(info, 'world', '0').setAttribute('__type', 'u8')
         element(info, 'tier', '-2').setAttribute('__type', 's8')
         element(info, 'license', infodict.get('license', ''))
-        element(info, 'bmlink_phase', '75').setAttribute('__type', 's32')
-        element(info, 'inf_ver', '75').setAttribute('__type', 'u8')
+        element(info, 'vmlink_phase', '0').setAttribute('__type', 's32')
+        element(info, 'inf_ver', '0').setAttribute('__type', 'u8')
 
         # Create difficulties section
         difficulty = element(music, 'difficulty')
