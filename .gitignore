@@ -3,4 +3,8 @@
 *.swp
 *.mu
 music-info.xml
+*adv.xml
+*exh.xml
+*nov.xml
 .mypy_cache
+*.def

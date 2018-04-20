@@ -3,10 +3,20 @@ import datetime
 import os
 import sys
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Tuple, Optional
 from xml.dom import minidom  # type: ignore
 
 class Museca:
+
+    @staticmethod
+    def get_notes(difficulty: str, data: bytes) -> bytes:
+        # Grab info
+        infodict = Museca.__get_metadata(data)
+
+        # Parse out BPM
+        bpms = Museca.__get_bpms(infodict.get('bpms', ''))
+
+        return b''
 
     @staticmethod
     def __get_notesections(data: bytes) -> Dict[str, Dict[str, str]]:
@@ -54,10 +64,7 @@ class Museca:
         return sections
 
     @staticmethod
-    def get_metadata(idval: int, data: bytes) -> bytes:
-        # Grab notes sections
-        notedetails = Museca.__get_notesections(data)
-
+    def __get_metadata(data: bytes) -> Dict[str, str]:
         lines = data.decode('utf-8').replace('\r', '\n').split('\n')
         lines = [line[1:-1] for line in lines if line.startswith('#') and line.endswith(';')]
         lines = [line for line in lines if ':' in line]
@@ -67,15 +74,31 @@ class Museca:
             section, value = line.split(':', 1)
             infodict[section.lower()] = value
 
-        # Parse out BPM
+        return infodict
+
+    @staticmethod
+    def __get_bpms(bpmstr: str) -> List[Tuple[float, float]]:
         bpms = []
-        for bpm in infodict.get('bpms', '').split(','):
+        for bpm in bpmstr.split(','):
             if '=' not in bpm:
                 continue
             time_val, bpm_val = bpm.split('=', 1)
             timeval = float(time_val)
             bpmval = float(bpm_val)
             bpms.append((timeval, bpmval))
+
+        return bpms
+
+    @staticmethod
+    def get_metadata(idval: int, data: bytes) -> bytes:
+        # Grab info
+        infodict = Museca.__get_metadata(data)
+
+        # Grab notes sections
+        notedetails = Museca.__get_notesections(data)
+
+        # Parse out BPM
+        bpms = Museca.__get_bpms(infodict.get('bpms', ''))
 
         # Grab max and min BPM
         maxbpm = max([bpm for (_, bpm) in bpms])
@@ -127,6 +150,21 @@ class Museca:
         element(info, 'bmlink_phase', '75').setAttribute('__type', 's32')
         element(info, 'inf_ver', '75').setAttribute('__type', 'u8')
 
+        # Create difficulties section
+        difficulty = element(music, 'difficulty')
+        for diffval in ['novice', 'advanced', 'exhaust', 'infinite']:
+            root = element(difficulty, diffval)
+            if diffval != 'infinite':
+                details = notedetails.get(diffval, {})
+            else:
+                detauls = {}  # type: Dict[str, str]
+
+            element(root, 'difnum', details.get('rating', '0')).setAttribute('__type', 'u8')
+            element(root, 'illustrator', infodict.get('credit'))
+            element(root, 'effected_by', details.get('author'))
+            element(root, 'price', '-1').setAttribute('__type', 's32')
+            element(root, 'limited', '1' if (diffval == 'infinite' or  details.get('rating', '0') == '0') else '3').setAttribute('__type', 'u8')
+
         return music_data.toprettyxml(indent="  ", encoding='shift-jis')
 
 def main() -> int:
@@ -165,6 +203,32 @@ def main() -> int:
     musicinfo = Museca.get_metadata(args.id, data)
     fp = open(os.path.join(root, 'music-info.xml'), 'wb')
     fp.write(musicinfo)
+    fp.close()
+
+    # Now, write out the chart data
+    novice = Museca.get_notes('novice', data)
+    fp = open(os.path.join(root, '01_{num:04d}_nov.xml'.format(num=args.id)), 'wb')
+    fp.write(novice)
+    fp.close()
+
+    # Now, write out the chart data
+    advanced = Museca.get_notes('advanced', data)
+    fp = open(os.path.join(root, '01_{num:04d}_adv.xml'.format(num=args.id)), 'wb')
+    fp.write(advanced)
+    fp.close()
+
+    # Now, write out the chart data
+    exhaust = Museca.get_notes('exhaust', data)
+    fp = open(os.path.join(root, '01_{num:04d}_exh.xml'.format(num=args.id)), 'wb')
+    fp.write(exhaust)
+    fp.close()
+
+    # Write out miscelaneous files
+    fp = open(os.path.join(root, '01_{num:04d}.def'.format(num=args.id)), 'wb')
+    fp.write('#define 01_{num:04d}   0\n'.format(num=args.id).encode('ascii'))
+    fp.close()
+    fp = open(os.path.join(root, '01_{num:04d}_prv.def'.format(num=args.id)), 'wb')
+    fp.write('#define 01_{num:04d}_prv   0\n'.format(num=args.id).encode('ascii'))
     fp.close()
 
     return 0
