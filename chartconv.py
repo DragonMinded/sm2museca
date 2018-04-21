@@ -121,23 +121,33 @@ class Museca:
                         if val == '0':
                             # No note
                             continue
-                        elif val == '1':
-                            # Regular note
+                        elif val in ['1', 's', 'l', 'r']:
+                            # Regular note/spin
                             if lane == 5:
                                 raise Exception('Invalid regular note on foot pedal on line {}!'.format(lineno))
 
                             events.append(event(
-                                Museca.EVENT_KIND_NOTE,
+                                {
+                                    '1': Museca.EVENT_KIND_NOTE,
+                                    's': Museca.EVENT_KIND_SMALL_SPINNER,
+                                    'l': Museca.EVENT_KIND_SMALL_SPINNER_LEFT,
+                                    'r': Museca.EVENT_KIND_SMALL_SPINNER_RIGHT,
+                                }[val],
                                 lane,
                                 curtime,
                                 curtime,
                             ))
-                        elif val == '2':
-                            # Hold note start
+                        elif val in ['2', 'S', 'L', 'R']:
+                            # Hold note/large spin start
                             pending_events.append((
                                 lineno,
                                 event(
-                                    Museca.EVENT_KIND_HOLD,
+                                    {
+                                        '2': Museca.EVENT_KIND_HOLD,
+                                        'S': Museca.EVENT_KIND_LARGE_SPINNER,
+                                        'L': Museca.EVENT_KIND_LARGE_SPINNER_LEFT,
+                                        'R': Museca.EVENT_KIND_LARGE_SPINNER_RIGHT,
+                                    }[val],
                                     lane,
                                     curtime,
                                     curtime,
@@ -160,6 +170,26 @@ class Museca:
 
                             if not found:
                                 raise Exception('End hold note with no start hold found on line {}!'.format(lineno))
+                        elif val == 'T':
+                            found = False
+                            for i in range(len(pending_events)):
+                                if (
+                                    pending_events[i][1]['kind'] in [
+                                        Museca.EVENT_KIND_LARGE_SPINNER,
+                                        Museca.EVENT_KIND_LARGE_SPINNER_LEFT,
+                                        Museca.EVENT_KIND_LARGE_SPINNER_RIGHT,
+                                    ] and pending_events[i][1]['lane'] == lane
+                                ):
+                                    # Found start, transfer it
+                                    pending_events[i][1]['end'] = int(curtime)
+                                    events.append(pending_events[i][1])
+                                    del pending_events[i]
+
+                                    found = True
+                                    break
+
+                            if not found:
+                                raise Exception('End spin note with no start spin found on line {}!'.format(lineno))
                         else:
                             raise Exception('Unknown note type {} on line {}!'.format(val, lineno))
 
