@@ -81,6 +81,9 @@ class Museca:
             # measure.
             ms_per_note = (seconds_per_measure / notes_per_measure) * 1000.0
 
+            # Also determine standard quarter-note spacing so we can lay out measure markers
+            ms_per_marker = (seconds_per_measure / 4) * 1000.0
+
             # First, lets output the measure markers
             events.append(event(
                 Museca.EVENT_KIND_MEASURE_MARKER,
@@ -91,20 +94,20 @@ class Museca:
             events.append(event(
                 Museca.EVENT_KIND_BEAT_MARKER,
                 Museca.EVENT_KIND_BEAT_MARKER,
-                curtime + ms_per_note,
-                curtime + ms_per_note,
+                curtime + ms_per_marker,
+                curtime + ms_per_marker,
             ))
             events.append(event(
                 Museca.EVENT_KIND_BEAT_MARKER,
                 Museca.EVENT_KIND_BEAT_MARKER,
-                curtime + ms_per_note * 2,
-                curtime + ms_per_note * 2,
+                curtime + ms_per_marker * 2,
+                curtime + ms_per_marker * 2,
             ))
             events.append(event(
                 Museca.EVENT_KIND_BEAT_MARKER,
                 Museca.EVENT_KIND_BEAT_MARKER,
-                curtime + ms_per_note * 3,
-                curtime + ms_per_note * 3,
+                curtime + ms_per_marker * 3,
+                curtime + ms_per_marker * 3,
             ))
 
             # Now, lets parse out the notes for each note in the measure.
