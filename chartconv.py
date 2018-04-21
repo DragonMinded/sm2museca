@@ -8,13 +8,183 @@ from xml.dom import minidom  # type: ignore
 
 class Museca:
 
+    EVENT_KIND_NOTE = 0
+    EVENT_KIND_HOLD = 1
+    EVENT_KIND_LARGE_SPINNER = 2
+    EVENT_KIND_LARGE_SPINNER_LEFT = 3
+    EVENT_KIND_LARGE_SPINNER_RIGHT = 4
+    EVENT_KIND_SMALL_SPINNER = 5
+    EVENT_KIND_SMALL_SPINNER_LEFT = 6
+    EVENT_KIND_SMALL_SPINNER_RIGHT = 7
+
+    EVENT_KIND_MEASURE_MARKER = 11
+    EVENT_KIND_BEAT_MARKER = 12
+
+    EVENT_KIND_GRAFICA_SECTION_START = 14
+    EVENT_KIND_GRAFICA_SECTION_END = 15
+
     @staticmethod
     def get_notes(difficulty: str, data: bytes) -> bytes:
         # Grab info
         infodict = Museca.__get_metadata(data)
 
-        # Parse out BPM
+        # Grab notes sections
+        notedetails = Museca.__get_notesections(data).get(difficulty)
+        if notedetails is None:
+            return b''
+
+        # Make sure we can parse the final measure
+        if notedetails['data']:
+            notedetails['data'].append((notedetails['data'][-1][0] + 1, ','))
+
+        # Parse out BPM, convert to milliseconds
         bpms = Museca.__get_bpms(infodict.get('bpms', ''))
+        bpms = sorted(
+            [(ts * 1000.0, bpm) for (ts, bpm) in bpms],
+            key=lambda b: b[0]
+        )
+
+        # Given a current time in milliseconds, return the BPM at the start of that
+        # measure.
+        def get_cur_bpm(cts: float) -> float:
+            for (ts, bpm) in bpms:
+                if cts >= ts:
+                    return bpm
+            raise Exception('Can\'t determine BPM!')
+
+        # Parse out the chart, one measure at a time.
+        curmeasure = []  # type: List[Tuple[int, str]]
+        events = []  # type: List[Dict[str, int]]
+        pending_events = []  # type: List[Tuple[int, Dict[str, int]]]
+
+        # The time at the beginning of the measure, in milliseconds
+        curtime = float(infodict.get('offset', '0.0')) * 1000.0
+
+        def event(kind: int, lane: int, start: float, end: float) -> Dict[str, int]:
+            return {
+                'kind': kind,
+                'lane': lane,
+                'start': int(start),
+                'end': int(end),
+            }
+
+        def parse_measure(curtime: float, measure: List[Tuple[int, str]]) -> float:
+            # First, get the BPM of this measure, and the divisor for the measure.
+            bpm = get_cur_bpm(curtime)
+            notes_per_measure = len(measure)
+
+            # Measures are 4/4 time, so figure out what one measure costs time-wise
+            seconds_per_beat = 60.0/bpm
+            seconds_per_measure = seconds_per_beat * 4.0
+
+            # Now, scale so we know how many seconds are taken up per tick in this
+            # measure.
+            ms_per_note = (seconds_per_measure / notes_per_measure) * 1000.0
+
+            # First, lets output the measure markers
+            events.append(event(
+                Museca.EVENT_KIND_MEASURE_MARKER,
+                Museca.EVENT_KIND_MEASURE_MARKER,
+                curtime,
+                curtime,
+            ))
+            events.append(event(
+                Museca.EVENT_KIND_BEAT_MARKER,
+                Museca.EVENT_KIND_BEAT_MARKER,
+                curtime + ms_per_note,
+                curtime + ms_per_note,
+            ))
+            events.append(event(
+                Museca.EVENT_KIND_BEAT_MARKER,
+                Museca.EVENT_KIND_BEAT_MARKER,
+                curtime + ms_per_note * 2,
+                curtime + ms_per_note * 2,
+            ))
+            events.append(event(
+                Museca.EVENT_KIND_BEAT_MARKER,
+                Museca.EVENT_KIND_BEAT_MARKER,
+                curtime + ms_per_note * 3,
+                curtime + ms_per_note * 3,
+            ))
+
+            # Now, lets parse out the notes for each note in the measure.
+            for (lineno, measurestring) in measure:
+                measuredata = [d.strip() for d in measurestring.split(' ')]
+                baddata = [d for d in measuredata if len(d) > 0 and len(d) != 6]
+                if len(baddata) > 0:
+                    raise Exception('Invalid measure data on line {}!'.format(lineno))
+
+                measuredata = [d for d in measuredata if len(d) == 6]
+                for mset in measuredata:
+                    for lane in range(len(mset)):
+                        val = mset[lane]
+                        if val == '0':
+                            # No note
+                            continue
+                        elif val == '1':
+                            # Regular note
+                            if lane == 5:
+                                raise Exception('Invalid regular note on foot pedal on line {}!'.format(lineno))
+
+                            events.append(event(
+                                Museca.EVENT_KIND_NOTE,
+                                lane,
+                                curtime,
+                                curtime,
+                            ))
+                        elif val == '2':
+                            # Hold note start
+                            pending_events.append((
+                                lineno,
+                                event(
+                                    Museca.EVENT_KIND_HOLD,
+                                    lane,
+                                    curtime,
+                                    curtime,
+                                )
+                            ))
+                        elif val == '3':
+                            found = False
+                            for i in range(len(pending_events)):
+                                if (
+                                    pending_events[i][1]['kind'] == Museca.EVENT_KIND_HOLD and
+                                    pending_events[i][1]['lane'] == lane
+                                ):
+                                    # Found start, transfer it
+                                    pending_events[i][1]['end'] = int(curtime)
+                                    events.append(pending_events[i][1])
+                                    del pending_events[i]
+
+                                    found = True
+                                    break
+
+                            if not found:
+                                raise Exception('End hold note with no start hold found on line {}!'.format(lineno))
+                        else:
+                            raise Exception('Unknown note type {} on line {}!'.format(val, lineno))
+
+                # Move ourselves forward past this time.
+                curtime = curtime + ms_per_note
+
+            # Finally, update our time
+            return curtime
+
+        for (lineno, line) in notedetails['data']:
+            if line.strip() == ',':
+                # Parse out current measure
+                curtime = parse_measure(curtime, curmeasure)
+                curmeasure = []
+            else:
+                curmeasure.append((lineno, line))
+
+        for (lineno, evt) in pending_events:
+            raise Exception('Note started on line {} is missing end marker!'.format(lineno))
+
+        # Events can be generated out of order, so lets sort them!
+        events = sorted(
+            events,
+            key=lambda event: event['start'],
+        )
 
         # Write out the chart
         chart = minidom.Document()
@@ -54,35 +224,80 @@ class Museca:
         element(signature, 'denomi', '4').setAttribute('__type', 's32')
 
         # Output parsed events
+        for parsedevent in events:
+            kind = parsedevent['kind']
+            lane = parsedevent['lane']
+
+            if kind in [
+                Museca.EVENT_KIND_MEASURE_MARKER,
+                Museca.EVENT_KIND_BEAT_MARKER,
+                Museca.EVENT_KIND_GRAFICA_SECTION_START,
+                Museca.EVENT_KIND_GRAFICA_SECTION_END,
+            ]:
+                # Special case, the lane doesn't matter for these as they're global.
+                lane = kind
+
+            if kind in [
+                Museca.EVENT_KIND_HOLD,
+                Museca.EVENT_KIND_LARGE_SPINNER,
+                Museca.EVENT_KIND_LARGE_SPINNER_LEFT,
+                Museca.EVENT_KIND_LARGE_SPINNER_RIGHT,
+            ]:
+                # Special case, holds and spins use 6-10 instead of 0-4. They still
+                # use 5 for foot pedal though because that can only be a hold.
+                if lane >= 0 and lane <= 4:
+                    lane = 6 + lane
+
+            eventnode = element(root, 'event')
+            element(eventnode, 'stime_ms', str(parsedevent['start'])).setAttribute('__type', 's64')
+            element(eventnode, 'etime_ms', str(parsedevent['end'])).setAttribute('__type', 's64')
+            element(eventnode, 'type', str(lane)).setAttribute('__type', 's32')
+            element(eventnode, 'kind', str(kind)).setAttribute('__type', 's32')
 
         # Return the chart
         return chart.toprettyxml(indent="  ", encoding='shift-jis')
 
     @staticmethod
-    def __get_notesections(data: bytes) -> Dict[str, Dict[str, str]]:
-        lines = data.decode('utf-8').replace('\r', '\n').split('\n')
+    def __get_notesections(data: bytes) -> Dict[str, Dict[str, Any]]:
+        lines = data.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n').split('\n')
         lines.append('')
 
+        # Line number for error reasons
         lineno = 1
 
-        sections = {}  # type: Dict[str, Dict[str, str]]
+        # All finished parsed sections
+        sections = {}  # type: Dict[str, Dict[str, Any]]
 
-        # This has to be stateful due to the protocol
-        cursection = {}  # type: Dict[str, str]
+        # Data we're building up about the current section
+        cursection = {}  # type: Dict[str, Any]
+
+        # Whether we're in a section or not.
         section = False
+
+        # The line of the section metadata we're parsing.
         sectionline = 0
+
+        # The names of the section metadata based on the above line.
         sectionnames = ['style', 'author', 'difficulty', 'rating']
+
+        # The line number that started the current section.
+        sectionstart = 0
+
+        # The measure data for the current section.
+        sectiondata = []  # type: List[Tuple[int, str]]
 
         for line in lines:
             # See if we should start parsing a notes section
             if line == '#NOTES:':
                 if section:
                     raise Exception(
-                        'Found expected NOTES section on line {}!'.format(lineno)
+                        'Found unexpected NOTES section on line {} inside existing section starting on line {}!'.format(lineno, sectionstart)
                     )
                 section = True
                 sectionline = 0
+                sectionstart = lineno
                 cursection = {}
+                sectiondata = []
 
             # See if we have a valid line in a notes section
             elif line.endswith(':') and len(line) > len(line.strip()):
@@ -91,13 +306,23 @@ class Museca:
                     sectionline = sectionline + 1
 
             # See if we ended a section.
-            elif section:
+            elif line.strip() == ';':
+                if not section:
+                    raise Exception(
+                        'Found spurious end section on line {}!'.format(lineno)
+                    )
                 if sectionline < 4:
                     raise Exception(
-                        'Didn\'t find enough metadata in section ending on line {}!'.format(lineno)
+                        'Didn\'t find enough metadata in section starting on line {}!'.format(sectionstart)
                     )
+
+                cursection['data'] = sectiondata
                 section = False
                 sections[cursection['difficulty'].lower()] = cursection
+
+            # Either measure data or garbage we care nothing about
+            elif section:
+                sectiondata.append((lineno, line))
 
             lineno = lineno + 1
 
