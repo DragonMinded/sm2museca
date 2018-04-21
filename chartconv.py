@@ -284,8 +284,8 @@ class Museca:
             element(eventnode, 'type', str(lane)).setAttribute('__type', 's32')
             element(eventnode, 'kind', str(kind)).setAttribute('__type', 's32')
 
-        # Return the chart
-        return chart.toprettyxml(indent="  ", encoding='shift-jis')
+        # Return the chart data.
+        return chart.toprettyxml(indent="  ").encode('ascii')
 
     @staticmethod
     def __get_notesections(data: bytes) -> Dict[str, Dict[str, Any]]:
@@ -460,7 +460,7 @@ class Museca:
             element(root, 'price', '-1').setAttribute('__type', 's32')
             element(root, 'limited', '1' if (diffval == 'infinite' or  details.get('rating', '0') == '0') else '3').setAttribute('__type', 'u8')
 
-        return music_data.toprettyxml(indent="  ", encoding='shift-jis')
+        return music_data.toprettyxml(indent="  ", encoding='utf-8').replace(b'utf-8', b'shift-jis')
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="A utility to convert StepMania-like charts to Museca format.")
