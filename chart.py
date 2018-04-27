@@ -22,26 +22,107 @@ class Constants:
     EVENT_KIND_GRAFICA_SECTION_START = 14
     EVENT_KIND_GRAFICA_SECTION_END = 15
 
-class StepMania:
+class Chart:
 
-    @staticmethod
-    def get_events(difficulty: str, data: bytes) -> Optional[List[Dict[str, int]]]:
-        # Grab info
-        infodict = StepMania.get_metadata(data)
+    def __init__(self, data: bytes) -> None:
+        self.metadata = self.__get_metadata(data)
+        self.notes = self.__get_notesections(data)
+        self.events = {}  # type: Dict[str, List[Dict[str, int]]]
+        for difficulty in ['novice', 'advanced', 'exhaust']:
+            if difficulty not in self.notes:
+                continue
+            self.events[difficulty] = self.__get_events(self.notes[difficulty])
 
-        # Grab notes sections
-        notedetails = StepMania.get_notesections(data).get(difficulty)
-        if notedetails is None:
-            return None
+    def __get_metadata(self, data: bytes) -> Dict[str, str]:
+        lines = data.decode('utf-8').replace('\r', '\n').split('\n')
+        lines = [line[1:-1] for line in lines if line.startswith('#') and line.endswith(';')]
+        lines = [line for line in lines if ':' in line]
 
+        infodict = {}  # type: Dict[str, str]
+        for line in lines:
+            section, value = line.split(':', 1)
+            infodict[section.lower()] = value
+
+        return infodict
+
+    def __get_notesections(self, data: bytes) -> Dict[str, Dict[str, Any]]:
+        lines = data.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n').split('\n')
+        lines.append('')
+
+        # Line number for error reasons
+        lineno = 1
+
+        # All finished parsed sections
+        sections = {}  # type: Dict[str, Dict[str, Any]]
+
+        # Data we're building up about the current section
+        cursection = {}  # type: Dict[str, Any]
+
+        # Whether we're in a section or not.
+        section = False
+
+        # The line of the section metadata we're parsing.
+        sectionline = 0
+
+        # The names of the section metadata based on the above line.
+        sectionnames = ['style', 'author', 'difficulty', 'rating']
+
+        # The line number that started the current section.
+        sectionstart = 0
+
+        # The measure data for the current section.
+        sectiondata = []  # type: List[Tuple[int, str]]
+
+        for line in lines:
+            # See if we should start parsing a notes section
+            if line == '#NOTES:':
+                if section:
+                    raise Exception(
+                        'Found unexpected NOTES section on line {} inside existing section starting on line {}!'.format(lineno, sectionstart)
+                    )
+                section = True
+                sectionline = 0
+                sectionstart = lineno
+                cursection = {}
+                sectiondata = []
+
+            # See if we have a valid line in a notes section
+            elif line.endswith(':') and len(line) > len(line.strip()):
+                if section and sectionline < len(sectionnames):
+                    cursection[sectionnames[sectionline]] = line[:-1].strip()
+                    sectionline = sectionline + 1
+
+            # See if we ended a section.
+            elif line.strip() == ';':
+                if not section:
+                    raise Exception(
+                        'Found spurious end section on line {}!'.format(lineno)
+                    )
+                if sectionline < 4:
+                    raise Exception(
+                        'Didn\'t find enough metadata in section starting on line {}!'.format(sectionstart)
+                    )
+
+                cursection['data'] = sectiondata
+                section = False
+                sections[cursection['difficulty'].lower()] = cursection
+
+            # Either measure data or garbage we care nothing about
+            elif section:
+                sectiondata.append((lineno, line))
+
+            lineno = lineno + 1
+
+        return sections
+
+    def __get_events(self, notedetails: Dict[str, Any]) -> Optional[List[Dict[str, int]]]:
         # Make sure we can parse the final measure
         if notedetails['data']:
             notedetails['data'].append((notedetails['data'][-1][0] + 1, ','))
 
         # Parse out BPM, convert to milliseconds
-        bpms = StepMania.get_bpms(infodict.get('bpms', ''))
         bpms = sorted(
-            [(ts * 1000.0, bpm) for (ts, bpm) in bpms],
+            [(ts * 1000.0, bpm) for (ts, bpm) in self.bpms],
             key=lambda b: b[0]
         )
 
@@ -59,7 +140,7 @@ class StepMania:
         pending_events = []  # type: List[Tuple[int, Dict[str, int]]]
 
         # The time at the beginning of the measure, in milliseconds
-        curtime = float(infodict.get('offset', '0.0')) * 1000.0
+        curtime = float(self.metadata.get('offset', '0.0')) * 1000.0
 
         def event(kind: int, lane: int, start: float, end: float) -> Dict[str, int]:
             return {
@@ -226,94 +307,10 @@ class StepMania:
 
         return events
 
-    @staticmethod
-    def get_notesections(data: bytes) -> Dict[str, Dict[str, Any]]:
-        lines = data.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n').split('\n')
-        lines.append('')
-
-        # Line number for error reasons
-        lineno = 1
-
-        # All finished parsed sections
-        sections = {}  # type: Dict[str, Dict[str, Any]]
-
-        # Data we're building up about the current section
-        cursection = {}  # type: Dict[str, Any]
-
-        # Whether we're in a section or not.
-        section = False
-
-        # The line of the section metadata we're parsing.
-        sectionline = 0
-
-        # The names of the section metadata based on the above line.
-        sectionnames = ['style', 'author', 'difficulty', 'rating']
-
-        # The line number that started the current section.
-        sectionstart = 0
-
-        # The measure data for the current section.
-        sectiondata = []  # type: List[Tuple[int, str]]
-
-        for line in lines:
-            # See if we should start parsing a notes section
-            if line == '#NOTES:':
-                if section:
-                    raise Exception(
-                        'Found unexpected NOTES section on line {} inside existing section starting on line {}!'.format(lineno, sectionstart)
-                    )
-                section = True
-                sectionline = 0
-                sectionstart = lineno
-                cursection = {}
-                sectiondata = []
-
-            # See if we have a valid line in a notes section
-            elif line.endswith(':') and len(line) > len(line.strip()):
-                if section and sectionline < len(sectionnames):
-                    cursection[sectionnames[sectionline]] = line[:-1].strip()
-                    sectionline = sectionline + 1
-
-            # See if we ended a section.
-            elif line.strip() == ';':
-                if not section:
-                    raise Exception(
-                        'Found spurious end section on line {}!'.format(lineno)
-                    )
-                if sectionline < 4:
-                    raise Exception(
-                        'Didn\'t find enough metadata in section starting on line {}!'.format(sectionstart)
-                    )
-
-                cursection['data'] = sectiondata
-                section = False
-                sections[cursection['difficulty'].lower()] = cursection
-
-            # Either measure data or garbage we care nothing about
-            elif section:
-                sectiondata.append((lineno, line))
-
-            lineno = lineno + 1
-
-        return sections
-
-    @staticmethod
-    def get_metadata(data: bytes) -> Dict[str, str]:
-        lines = data.decode('utf-8').replace('\r', '\n').split('\n')
-        lines = [line[1:-1] for line in lines if line.startswith('#') and line.endswith(';')]
-        lines = [line for line in lines if ':' in line]
-
-        infodict = {}  # type: Dict[str, str]
-        for line in lines:
-            section, value = line.split(':', 1)
-            infodict[section.lower()] = value
-
-        return infodict
-
-    @staticmethod
-    def get_bpms(bpmstr: str) -> List[Tuple[float, float]]:
+    @property
+    def bpms(self) -> List[Tuple[float, float]]:
         bpms = []
-        for bpm in bpmstr.split(','):
+        for bpm in self.metadata.get('bpms', '').split(','):
             if '=' not in bpm:
                 continue
             time_val, bpm_val = bpm.split('=', 1)
@@ -323,21 +320,22 @@ class StepMania:
 
         return bpms
 
-class Museca:
+class XML:
 
-    @staticmethod
-    def get_notes(difficulty: str, data: bytes) -> bytes:
+    def __init__(self, chart: Chart, chartid: int) -> None:
+        self.__chart = chart
+        self.__id = chartid
+
+    def get_notes(self, difficulty: str) -> bytes:
         # Grab the parsed event data for this difficulty.
-        events = StepMania.get_events(difficulty, data)
+        events = self.__chart.events.get(difficulty)
 
         if events is None:
             return b''
 
         # Parse out BPM, convert to milliseconds
-        infodict = StepMania.get_metadata(data)
-        bpms = StepMania.get_bpms(infodict.get('bpms', ''))
         bpms = sorted(
-            [(ts * 1000.0, bpm) for (ts, bpm) in bpms],
+            [(ts * 1000.0, bpm) for (ts, bpm) in self.__chart.bpms],
             key=lambda b: b[0]
         )
 
@@ -412,16 +410,15 @@ class Museca:
         # Return the chart data.
         return chart.toprettyxml(indent="  ").encode('ascii')
 
-    @staticmethod
-    def get_metadata(idval: int, data: bytes) -> bytes:
+    def get_metadata(self) -> bytes:
         # Grab info
-        infodict = StepMania.get_metadata(data)
+        infodict = self.__chart.metadata
 
         # Grab notes sections
-        notedetails = StepMania.get_notesections(data)
+        notedetails = self.__chart.notes
 
         # Parse out BPM
-        bpms = StepMania.get_bpms(infodict.get('bpms', ''))
+        bpms = self.__chart.bpms
 
         # Grab max and min BPM
         maxbpm = max([bpm for (_, bpm) in bpms])
@@ -444,13 +441,13 @@ class Museca:
 
         # Create a single child with the right music ID
         music = element(mdb, 'music')
-        music.setAttribute('id', str(idval))
+        music.setAttribute('id', str(self.__id))
 
         # Create info section for metadata
         info = element(music, 'info')
 
         # Copypasta into info the various data we should have
-        element(info, 'label', str(idval))
+        element(info, 'label', str(self.__id))
         element(info, 'title_name', infodict.get('title', ''))
         element(info, 'title_yomigana', infodict.get('title_yomigana', ''))
         element(info, 'artist_name', infodict.get('artist', ''))

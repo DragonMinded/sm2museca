@@ -6,7 +6,7 @@ import sys
 from typing import Dict, Any, List, Tuple, Optional
 from xml.dom import minidom  # type: ignore
 
-from chart import Museca
+from chart import Chart, XML
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="A utility to convert StepMania-like charts to Museca format.")
@@ -40,28 +40,28 @@ def main() -> int:
     data = fp.read()
     fp.close()
 
+    # First, parse out the chart and get the XML writer ready.
+    chart = Chart(data)
+    xml = XML(chart, args.id)
+
     # First, write out a metadata file, that can be copied into music-info.xml
-    musicinfo = Museca.get_metadata(args.id, data)
     fp = open(os.path.join(root, 'music-info.xml'), 'wb')
-    fp.write(musicinfo)
+    fp.write(xml.get_metadata())
     fp.close()
 
     # Now, write out the chart data
-    novice = Museca.get_notes('novice', data)
     fp = open(os.path.join(root, '01_{num:04d}_nov.xml'.format(num=args.id)), 'wb')
-    fp.write(novice)
+    fp.write(xml.get_notes('novice'))
     fp.close()
 
     # Now, write out the chart data
-    advanced = Museca.get_notes('advanced', data)
     fp = open(os.path.join(root, '01_{num:04d}_adv.xml'.format(num=args.id)), 'wb')
-    fp.write(advanced)
+    fp.write(xml.get_notes('advanced'))
     fp.close()
 
     # Now, write out the chart data
-    exhaust = Museca.get_notes('exhaust', data)
     fp = open(os.path.join(root, '01_{num:04d}_exh.xml'.format(num=args.id)), 'wb')
-    fp.write(exhaust)
+    fp.write(xml.get_notes('exhaust'))
     fp.close()
 
     # Write out miscelaneous files
