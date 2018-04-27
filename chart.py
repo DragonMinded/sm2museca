@@ -6,8 +6,7 @@ import sys
 from typing import Dict, Any, List, Tuple, Optional
 from xml.dom import minidom  # type: ignore
 
-class Museca:
-
+class Constants:
     EVENT_KIND_NOTE = 0
     EVENT_KIND_HOLD = 1
     EVENT_KIND_LARGE_SPINNER = 2
@@ -23,13 +22,15 @@ class Museca:
     EVENT_KIND_GRAFICA_SECTION_START = 14
     EVENT_KIND_GRAFICA_SECTION_END = 15
 
+class StepMania:
+
     @staticmethod
-    def __get_events(difficulty: str, data: bytes) -> Optional[List[Dict[str, int]]]:
+    def get_events(difficulty: str, data: bytes) -> Optional[List[Dict[str, int]]]:
         # Grab info
-        infodict = Museca.__get_metadata(data)
+        infodict = StepMania.get_metadata(data)
 
         # Grab notes sections
-        notedetails = Museca.__get_notesections(data).get(difficulty)
+        notedetails = StepMania.get_notesections(data).get(difficulty)
         if notedetails is None:
             return None
 
@@ -38,7 +39,7 @@ class Museca:
             notedetails['data'].append((notedetails['data'][-1][0] + 1, ','))
 
         # Parse out BPM, convert to milliseconds
-        bpms = Museca.__get_bpms(infodict.get('bpms', ''))
+        bpms = StepMania.get_bpms(infodict.get('bpms', ''))
         bpms = sorted(
             [(ts * 1000.0, bpm) for (ts, bpm) in bpms],
             key=lambda b: b[0]
@@ -86,26 +87,26 @@ class Museca:
 
             # First, lets output the measure markers
             events.append(event(
-                Museca.EVENT_KIND_MEASURE_MARKER,
-                Museca.EVENT_KIND_MEASURE_MARKER,
+                Constants.EVENT_KIND_MEASURE_MARKER,
+                Constants.EVENT_KIND_MEASURE_MARKER,
                 curtime,
                 curtime,
             ))
             events.append(event(
-                Museca.EVENT_KIND_BEAT_MARKER,
-                Museca.EVENT_KIND_BEAT_MARKER,
+                Constants.EVENT_KIND_BEAT_MARKER,
+                Constants.EVENT_KIND_BEAT_MARKER,
                 curtime + ms_per_marker,
                 curtime + ms_per_marker,
             ))
             events.append(event(
-                Museca.EVENT_KIND_BEAT_MARKER,
-                Museca.EVENT_KIND_BEAT_MARKER,
+                Constants.EVENT_KIND_BEAT_MARKER,
+                Constants.EVENT_KIND_BEAT_MARKER,
                 curtime + ms_per_marker * 2,
                 curtime + ms_per_marker * 2,
             ))
             events.append(event(
-                Museca.EVENT_KIND_BEAT_MARKER,
-                Museca.EVENT_KIND_BEAT_MARKER,
+                Constants.EVENT_KIND_BEAT_MARKER,
+                Constants.EVENT_KIND_BEAT_MARKER,
                 curtime + ms_per_marker * 3,
                 curtime + ms_per_marker * 3,
             ))
@@ -131,10 +132,10 @@ class Museca:
 
                             events.append(event(
                                 {
-                                    '1': Museca.EVENT_KIND_NOTE,
-                                    's': Museca.EVENT_KIND_SMALL_SPINNER,
-                                    'l': Museca.EVENT_KIND_SMALL_SPINNER_LEFT,
-                                    'r': Museca.EVENT_KIND_SMALL_SPINNER_RIGHT,
+                                    '1': Constants.EVENT_KIND_NOTE,
+                                    's': Constants.EVENT_KIND_SMALL_SPINNER,
+                                    'l': Constants.EVENT_KIND_SMALL_SPINNER_LEFT,
+                                    'r': Constants.EVENT_KIND_SMALL_SPINNER_RIGHT,
                                 }[val],
                                 lane,
                                 curtime,
@@ -150,10 +151,10 @@ class Museca:
                                 lineno,
                                 event(
                                     {
-                                        '2': Museca.EVENT_KIND_HOLD,
-                                        'S': Museca.EVENT_KIND_LARGE_SPINNER,
-                                        'L': Museca.EVENT_KIND_LARGE_SPINNER_LEFT,
-                                        'R': Museca.EVENT_KIND_LARGE_SPINNER_RIGHT,
+                                        '2': Constants.EVENT_KIND_HOLD,
+                                        'S': Constants.EVENT_KIND_LARGE_SPINNER,
+                                        'L': Constants.EVENT_KIND_LARGE_SPINNER_LEFT,
+                                        'R': Constants.EVENT_KIND_LARGE_SPINNER_RIGHT,
                                     }[val],
                                     lane,
                                     curtime,
@@ -164,7 +165,7 @@ class Museca:
                             found = False
                             for i in range(len(pending_events)):
                                 if (
-                                    pending_events[i][1]['kind'] == Museca.EVENT_KIND_HOLD and
+                                    pending_events[i][1]['kind'] == Constants.EVENT_KIND_HOLD and
                                     pending_events[i][1]['lane'] == lane
                                 ):
                                     # Found start, transfer it
@@ -182,9 +183,9 @@ class Museca:
                             for i in range(len(pending_events)):
                                 if (
                                     pending_events[i][1]['kind'] in [
-                                        Museca.EVENT_KIND_LARGE_SPINNER,
-                                        Museca.EVENT_KIND_LARGE_SPINNER_LEFT,
-                                        Museca.EVENT_KIND_LARGE_SPINNER_RIGHT,
+                                        Constants.EVENT_KIND_LARGE_SPINNER,
+                                        Constants.EVENT_KIND_LARGE_SPINNER_LEFT,
+                                        Constants.EVENT_KIND_LARGE_SPINNER_RIGHT,
                                     ] and pending_events[i][1]['lane'] == lane
                                 ):
                                     # Found start, transfer it
@@ -226,94 +227,7 @@ class Museca:
         return events
 
     @staticmethod
-    def get_notes(difficulty: str, data: bytes) -> bytes:
-        # Grab the parsed event data for this difficulty.
-        events = Museca.__get_events(difficulty, data)
-
-        if events is None:
-            return b''
-
-        # Parse out BPM, convert to milliseconds
-        infodict = Museca.__get_metadata(data)
-        bpms = Museca.__get_bpms(infodict.get('bpms', ''))
-        bpms = sorted(
-            [(ts * 1000.0, bpm) for (ts, bpm) in bpms],
-            key=lambda b: b[0]
-        )
-
-        # Write out the chart
-        chart = minidom.Document()
-        root = chart.createElement('data')
-        chart.appendChild(root)
-
-        def element(parent: Any, name: str, value: Optional[str]=None) -> Any:
-            element = chart.createElement(name)
-            parent.appendChild(element)
-
-            if value is not None:
-                text = chart.createTextNode(value)
-                element.appendChild(text)
-
-            return element
-
-        # Chart info
-        smf_info = element(root, 'smf_info')
-        element(smf_info, 'ticks', '480').setAttribute('__type', 's32')
-
-        tempo_info = element(smf_info, 'tempo_info')
-
-        # Copy down BPM changes
-        for (timedelta, bpm) in bpms:
-            tempo = element(tempo_info, 'tempo')
-            element(tempo, 'time', str(int(timedelta * 100))).setAttribute('__type', 's32')
-            element(tempo, 'delta_time', '0').setAttribute('__type', 's32')
-            element(tempo, 'val', str(int((60.0 / bpm) * 1000000))).setAttribute('__type', 's32')
-            element(tempo, 'bpm', str(int(bpm * 100))).setAttribute('__type', 's64')
-
-        # We don't currently support signature changes, so none of that here
-        sig_info = element(smf_info, 'sig_info')
-        signature = element(sig_info, 'signature')
-        element(signature, 'time', '0').setAttribute('__type', 's32')
-        element(signature, 'delta_time', '0').setAttribute('__type', 's32')
-        element(signature, 'num', '4').setAttribute('__type', 's32')
-        element(signature, 'denomi', '4').setAttribute('__type', 's32')
-
-        # Output parsed events
-        for parsedevent in events:
-            kind = parsedevent['kind']
-            lane = parsedevent['lane']
-
-            if kind in [
-                Museca.EVENT_KIND_MEASURE_MARKER,
-                Museca.EVENT_KIND_BEAT_MARKER,
-                Museca.EVENT_KIND_GRAFICA_SECTION_START,
-                Museca.EVENT_KIND_GRAFICA_SECTION_END,
-            ]:
-                # Special case, the lane doesn't matter for these as they're global.
-                lane = kind
-
-            if kind in [
-                Museca.EVENT_KIND_HOLD,
-                Museca.EVENT_KIND_LARGE_SPINNER,
-                Museca.EVENT_KIND_LARGE_SPINNER_LEFT,
-                Museca.EVENT_KIND_LARGE_SPINNER_RIGHT,
-            ]:
-                # Special case, holds and spins use 6-10 instead of 0-4. They still
-                # use 5 for foot pedal though because that can only be a hold.
-                if lane >= 0 and lane <= 4:
-                    lane = 6 + lane
-
-            eventnode = element(root, 'event')
-            element(eventnode, 'stime_ms', str(parsedevent['start'])).setAttribute('__type', 's64')
-            element(eventnode, 'etime_ms', str(parsedevent['end'])).setAttribute('__type', 's64')
-            element(eventnode, 'type', str(lane)).setAttribute('__type', 's32')
-            element(eventnode, 'kind', str(kind)).setAttribute('__type', 's32')
-
-        # Return the chart data.
-        return chart.toprettyxml(indent="  ").encode('ascii')
-
-    @staticmethod
-    def __get_notesections(data: bytes) -> Dict[str, Dict[str, Any]]:
+    def get_notesections(data: bytes) -> Dict[str, Dict[str, Any]]:
         lines = data.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n').split('\n')
         lines.append('')
 
@@ -384,7 +298,7 @@ class Museca:
         return sections
 
     @staticmethod
-    def __get_metadata(data: bytes) -> Dict[str, str]:
+    def get_metadata(data: bytes) -> Dict[str, str]:
         lines = data.decode('utf-8').replace('\r', '\n').split('\n')
         lines = [line[1:-1] for line in lines if line.startswith('#') and line.endswith(';')]
         lines = [line for line in lines if ':' in line]
@@ -397,7 +311,7 @@ class Museca:
         return infodict
 
     @staticmethod
-    def __get_bpms(bpmstr: str) -> List[Tuple[float, float]]:
+    def get_bpms(bpmstr: str) -> List[Tuple[float, float]]:
         bpms = []
         for bpm in bpmstr.split(','):
             if '=' not in bpm:
@@ -409,16 +323,105 @@ class Museca:
 
         return bpms
 
+class Museca:
+
+    @staticmethod
+    def get_notes(difficulty: str, data: bytes) -> bytes:
+        # Grab the parsed event data for this difficulty.
+        events = StepMania.get_events(difficulty, data)
+
+        if events is None:
+            return b''
+
+        # Parse out BPM, convert to milliseconds
+        infodict = StepMania.get_metadata(data)
+        bpms = StepMania.get_bpms(infodict.get('bpms', ''))
+        bpms = sorted(
+            [(ts * 1000.0, bpm) for (ts, bpm) in bpms],
+            key=lambda b: b[0]
+        )
+
+        # Write out the chart
+        chart = minidom.Document()
+        root = chart.createElement('data')
+        chart.appendChild(root)
+
+        def element(parent: Any, name: str, value: Optional[str]=None) -> Any:
+            element = chart.createElement(name)
+            parent.appendChild(element)
+
+            if value is not None:
+                text = chart.createTextNode(value)
+                element.appendChild(text)
+
+            return element
+
+        # Chart info
+        smf_info = element(root, 'smf_info')
+        element(smf_info, 'ticks', '480').setAttribute('__type', 's32')
+
+        tempo_info = element(smf_info, 'tempo_info')
+
+        # Copy down BPM changes
+        for (timedelta, bpm) in bpms:
+            tempo = element(tempo_info, 'tempo')
+            element(tempo, 'time', str(int(timedelta * 100))).setAttribute('__type', 's32')
+            element(tempo, 'delta_time', '0').setAttribute('__type', 's32')
+            element(tempo, 'val', str(int((60.0 / bpm) * 1000000))).setAttribute('__type', 's32')
+            element(tempo, 'bpm', str(int(bpm * 100))).setAttribute('__type', 's64')
+
+        # We don't currently support signature changes, so none of that here
+        sig_info = element(smf_info, 'sig_info')
+        signature = element(sig_info, 'signature')
+        element(signature, 'time', '0').setAttribute('__type', 's32')
+        element(signature, 'delta_time', '0').setAttribute('__type', 's32')
+        element(signature, 'num', '4').setAttribute('__type', 's32')
+        element(signature, 'denomi', '4').setAttribute('__type', 's32')
+
+        # Output parsed events
+        for parsedevent in events:
+            kind = parsedevent['kind']
+            lane = parsedevent['lane']
+
+            if kind in [
+                Constants.EVENT_KIND_MEASURE_MARKER,
+                Constants.EVENT_KIND_BEAT_MARKER,
+                Constants.EVENT_KIND_GRAFICA_SECTION_START,
+                Constants.EVENT_KIND_GRAFICA_SECTION_END,
+            ]:
+                # Special case, the lane doesn't matter for these as they're global.
+                lane = kind
+
+            if kind in [
+                Constants.EVENT_KIND_HOLD,
+                Constants.EVENT_KIND_LARGE_SPINNER,
+                Constants.EVENT_KIND_LARGE_SPINNER_LEFT,
+                Constants.EVENT_KIND_LARGE_SPINNER_RIGHT,
+            ]:
+                # Special case, holds and spins use 6-10 instead of 0-4. They still
+                # use 5 for foot pedal though because that can only be a hold.
+                if lane >= 0 and lane <= 4:
+                    lane = 6 + lane
+
+            eventnode = element(root, 'event')
+            element(eventnode, 'stime_ms', str(parsedevent['start'])).setAttribute('__type', 's64')
+            element(eventnode, 'etime_ms', str(parsedevent['end'])).setAttribute('__type', 's64')
+            element(eventnode, 'type', str(lane)).setAttribute('__type', 's32')
+            element(eventnode, 'kind', str(kind)).setAttribute('__type', 's32')
+
+        # Return the chart data.
+        return chart.toprettyxml(indent="  ").encode('ascii')
+
     @staticmethod
     def get_metadata(idval: int, data: bytes) -> bytes:
         # Grab info
-        infodict = Museca.__get_metadata(data)
+        infodict = StepMania.get_metadata(data)
 
         # Grab notes sections
-        notedetails = Museca.__get_notesections(data)
+        notedetails = StepMania.get_notesections(data)
 
         # Parse out BPM
-        bpms = Museca.__get_bpms(infodict.get('bpms', ''))
+        bpms = StepMania.get_bpms(infodict.get('bpms', ''))
 
         # Grab max and min BPM
         maxbpm = max([bpm for (_, bpm) in bpms])
@@ -486,72 +489,3 @@ class Museca:
             element(root, 'limited', '1' if (diffval == 'infinite' or  details.get('rating', '0') == '0') else '3').setAttribute('__type', 'u8')
 
         return music_data.toprettyxml(indent="  ", encoding='utf-8').replace(b'utf-8', b'shift-jis')
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description="A utility to convert StepMania-like charts to Museca format.")
-    parser.add_argument(
-        "file",
-        metavar="FILE",
-        help=".mu file to convert to Museca format.",
-        type=str,
-    )
-    parser.add_argument(
-        "id",
-        metavar="ID",
-        help="ID to assign this song.",
-        type=int,
-    )
-    parser.add_argument(
-        "-d",
-        "--directory",
-        help="Directory to place files in. Defaults to current directory.",
-        default='.',
-    )
-
-    args = parser.parse_args()
-    root = args.directory
-    if root[-1] != '/':
-        root = root + '/'
-    root = os.path.realpath(root)
-    os.makedirs(root, exist_ok=True)
-
-    fp = open(args.file, 'rb')
-    data = fp.read()
-    fp.close()
-
-    # First, write out a metadata file, that can be copied into music-info.xml
-    musicinfo = Museca.get_metadata(args.id, data)
-    fp = open(os.path.join(root, 'music-info.xml'), 'wb')
-    fp.write(musicinfo)
-    fp.close()
-
-    # Now, write out the chart data
-    novice = Museca.get_notes('novice', data)
-    fp = open(os.path.join(root, '01_{num:04d}_nov.xml'.format(num=args.id)), 'wb')
-    fp.write(novice)
-    fp.close()
-
-    # Now, write out the chart data
-    advanced = Museca.get_notes('advanced', data)
-    fp = open(os.path.join(root, '01_{num:04d}_adv.xml'.format(num=args.id)), 'wb')
-    fp.write(advanced)
-    fp.close()
-
-    # Now, write out the chart data
-    exhaust = Museca.get_notes('exhaust', data)
-    fp = open(os.path.join(root, '01_{num:04d}_exh.xml'.format(num=args.id)), 'wb')
-    fp.write(exhaust)
-    fp.close()
-
-    # Write out miscelaneous files
-    fp = open(os.path.join(root, '01_{num:04d}.def'.format(num=args.id)), 'wb')
-    fp.write('#define 01_{num:04d}   0\n'.format(num=args.id).encode('ascii'))
-    fp.close()
-    fp = open(os.path.join(root, '01_{num:04d}_prv.def'.format(num=args.id)), 'wb')
-    fp.write('#define 01_{num:04d}_prv   0\n'.format(num=args.id).encode('ascii'))
-    fp.close()
-
-    return 0
-
-if __name__ == '__main__':
-    sys.exit(main())
