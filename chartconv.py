@@ -127,7 +127,7 @@ class Museca:
                         elif val in ['1', 's', 'l', 'r']:
                             # Regular note/spin
                             if lane == 5:
-                                raise Exception('Invalid regular note on foot pedal on line {}!'.format(lineno))
+                                raise Exception('Invalid regular note for foot pedal on line {}!'.format(lineno))
 
                             events.append(event(
                                 {
@@ -142,6 +142,10 @@ class Museca:
                             ))
                         elif val in ['2', 'S', 'L', 'R']:
                             # Hold note/large spin start
+                            if lane == 5 and val != '2':
+                                raise Exception('Invalid spin note for foot pedal on line {}!'.format(lineno))
+
+                            # Regular note/spin
                             pending_events.append((
                                 lineno,
                                 event(
@@ -172,7 +176,7 @@ class Museca:
                                     break
 
                             if not found:
-                                raise Exception('End hold note with no start hold found on line {}!'.format(lineno))
+                                raise Exception('End hold note with no start hold found for lane {} on line {}!'.format(lane + 1, lineno))
                         elif val == 'T':
                             found = False
                             for i in range(len(pending_events)):
@@ -192,9 +196,9 @@ class Museca:
                                     break
 
                             if not found:
-                                raise Exception('End spin note with no start spin found on line {}!'.format(lineno))
+                                raise Exception('End spin note with no start spin found for lane {} on line {}!'.format(lane + 1, lineno))
                         else:
-                            raise Exception('Unknown note type {} on line {}!'.format(val, lineno))
+                            raise Exception('Unknown note type {} for lane {} on line {}!'.format(val, lane + 1, lineno))
 
                 # Move ourselves forward past this time.
                 curtime = curtime + ms_per_note
@@ -211,7 +215,7 @@ class Museca:
                 curmeasure.append((lineno, line))
 
         for (lineno, evt) in pending_events:
-            raise Exception('Note started on line {} is missing end marker!'.format(lineno))
+            raise Exception('Note started on line {} for lane {} is missing end marker!'.format(lineno, evt['lane'] + 1))
 
         # Events can be generated out of order, so lets sort them!
         events = sorted(

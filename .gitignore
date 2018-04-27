@@ -3,6 +3,7 @@
 *.swp
 *.mu
 music-info.xml
+__pycache__
 *adv.xml
 *exh.xml
 *nov.xml
