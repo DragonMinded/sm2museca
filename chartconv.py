@@ -24,14 +24,14 @@ class Museca:
     EVENT_KIND_GRAFICA_SECTION_END = 15
 
     @staticmethod
-    def get_notes(difficulty: str, data: bytes) -> bytes:
+    def __get_events(difficulty: str, data: bytes) -> Optional[List[Dict[str, int]]]:
         # Grab info
         infodict = Museca.__get_metadata(data)
 
         # Grab notes sections
         notedetails = Museca.__get_notesections(data).get(difficulty)
         if notedetails is None:
-            return b''
+            return None
 
         # Make sure we can parse the final measure
         if notedetails['data']:
@@ -221,6 +221,24 @@ class Museca:
         events = sorted(
             events,
             key=lambda event: event['start'],
+        )
+
+        return events
+
+    @staticmethod
+    def get_notes(difficulty: str, data: bytes) -> bytes:
+        # Grab the parsed event data for this difficulty.
+        events = Museca.__get_events(difficulty, data)
+
+        if events is None:
+            return b''
+
+        # Parse out BPM, convert to milliseconds
+        infodict = Museca.__get_metadata(data)
+        bpms = Museca.__get_bpms(infodict.get('bpms', ''))
+        bpms = sorted(
+            [(ts * 1000.0, bpm) for (ts, bpm) in bpms],
+            key=lambda b: b[0]
         )
 
         # Write out the chart
