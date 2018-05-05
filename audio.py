@@ -101,15 +101,23 @@ class TwoDX:
 
 class ADPCM:
 
-    def __init__(self, filename: str) -> None:
-        self.__filename = filename
-        self.__data = None
+    FADE_LENGTH = 0.5
 
-    def __conv_file(self) -> None:
-        if self.__data is not None:
-            raise Exception('Logic error, re-converting audio file!')
+    def __init__(self, filename: str, preview_offset: float, preview_length: float) -> None:
+        self.__filename = filename
+        self.__preview_offset = preview_offset
+        self.__preview_length = preview_length
+        self.__full_data = None
+        self.__preview_data = None
+
+    def __check_file(self) -> None:
         if not os.path.exists(self.__filename):
             raise Exception('File \'{}\' does not exist!'.format(self.__filename))
+
+    def __conv_file(self) -> None:
+        self.__check_file()
+        if self.__full_data is not None:
+            raise Exception('Logic error, re-converting audio file!')
 
         # We must create a temporary file, use ffmpeg to convert the file
         # to MS-ADPCM and then load those bytes in.
@@ -131,10 +139,78 @@ class ADPCM:
             ])
 
             temp.seek(0)
-            self.__data = temp.read()
+            self.__full_data = temp.read()
 
-    def get_adpcm_data(self) -> bytes:
-        if self.__data is None:
+    def __conv_preview(self) -> None:
+        self.__check_file()
+        if self.__preview_data is not None:
+            raise Exception('Logic error, re-converting audio file!')
+
+        # We have to convert to .wav because SOX sometimes doesn't have
+        # codecs for other formats, so we support everything ffmpeg does.
+        with tempfile.NamedTemporaryFile(suffix='.wav') as intemp:
+            subprocess.call([
+                'ffmpeg',
+                '-y',
+                '-hide_banner',
+                '-nostats',
+                '-loglevel',
+                'quiet',
+                '-i',
+                self.__filename,
+                intemp.name,
+            ])
+
+            # Now, get sox to cut this up into a new file.
+            with tempfile.NamedTemporaryFile(suffix='.wav') as cuttemp:
+                subprocess.call([
+                    'sox',
+                    intemp.name,
+                    cuttemp.name,
+                    # SOX fade can act weird, so we add a buffer on both
+                    # sides and fade into that.
+                    'trim',
+                    str(self.__preview_offset - self.FADE_LENGTH),
+                    str(self.__preview_length + self.FADE_LENGTH),
+                    'fade',
+                    str(self.FADE_LENGTH * 2.0),
+                    str(self.__preview_length + self.FADE_LENGTH),
+                    str(self.FADE_LENGTH),
+                    # Now, we trim after the fade to get a better preview.
+                    'trim',
+                    str(self.FADE_LENGTH),
+                    str(self.__preview_length),
+                ])
+
+                # Now, do the final conversion to ADPCM and load the data.
+                with tempfile.NamedTemporaryFile(suffix='.wav') as outtemp:
+                    subprocess.call([
+                        'ffmpeg',
+                        '-y',
+                        '-hide_banner',
+                        '-nostats',
+                        '-loglevel',
+                        'quiet',
+                        '-i',
+                        cuttemp.name,
+                        '-acodec',
+                        'adpcm_ms',
+                        '-ar',
+                        '44100',
+                        outtemp.name,
+                    ])
+
+                    outtemp.seek(0)
+                    self.__preview_data = outtemp.read()
+
+    def get_full_data(self) -> bytes:
+        if self.__full_data is None:
             self.__conv_file()
 
-        return self.__data
+        return self.__full_data
+
+    def get_preview_data(self) -> bytes:
+        if self.__preview_data is None:
+            self.__conv_preview()
+
+        return self.__preview_data

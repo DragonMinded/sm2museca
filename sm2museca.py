@@ -80,14 +80,38 @@ def main() -> int:
     # Now, if we have an audio file, convert that too
     musicfile = chart.metadata.get('music')
     if musicfile is not None:
+        # Make sure we also provided a sample start/offset
+        preview_start = chart.metadata.get('samplestart')
+        preview_length = chart.metadata.get('samplelength')
+
+        if preview_start is None:
+            raise Exception('Music file present but no sample start specified for preview!')
+        sample_start = float(preview_start)
+        if preview_length is None:
+            print('WARNING: No sample length specified, assuming 10 seconds!', file=sys.stderr)
+            sample_length = 10.0
+        else:
+            sample_length = float(preview_length)
+
         print('Converting audio...')
-        adpcm = ADPCM(musicfile)
+
+        adpcm = ADPCM(musicfile, sample_start, sample_length)
 
         twodx = TwoDX()
         twodx.set_name('01_{num:04d}'.format(num=args.id))
-        twodx.write_file('01_{num:04d}_1.wav'.format(num=args.id), adpcm.get_adpcm_data())
+        twodx.write_file('01_{num:04d}_1.wav'.format(num=args.id), adpcm.get_full_data())
 
         fp = open(os.path.join(root, '01_{num:04d}.2dx'.format(num=args.id)), 'wb')
+        fp.write(twodx.get_new_data())
+        fp.close()
+
+        print('Converting preview...')
+
+        twodx = TwoDX()
+        twodx.set_name('01_{num:04d}_prv'.format(num=args.id))
+        twodx.write_file('01_{num:04d}_prv_1.wav'.format(num=args.id), adpcm.get_preview_data())
+
+        fp = open(os.path.join(root, '01_{num:04d}_prv.2dx'.format(num=args.id)), 'wb')
         fp.write(twodx.get_new_data())
         fp.close()
 
