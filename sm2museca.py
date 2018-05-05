@@ -7,6 +7,7 @@ from typing import Dict, Any, List, Tuple, Optional
 from xml.dom import minidom  # type: ignore
 
 from chart import Chart, XML
+from audio import TwoDX, ADPCM
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="A utility to convert StepMania-like charts to Museca format.")
@@ -40,9 +41,13 @@ def main() -> int:
     data = fp.read()
     fp.close()
 
+    print('Parsing chart data...')
+
     # First, parse out the chart and get the XML writer ready.
     chart = Chart(data)
     xml = XML(chart, args.id)
+
+    print('Outputting XML...')
 
     # First, write out a metadata file, that can be copied into music-info.xml
     fp = open(os.path.join(root, 'music-info.xml'), 'wb')
@@ -71,6 +76,22 @@ def main() -> int:
     fp = open(os.path.join(root, '01_{num:04d}_prv.def'.format(num=args.id)), 'wb')
     fp.write('#define 01_{num:04d}_prv   0\n'.format(num=args.id).encode('ascii'))
     fp.close()
+
+    # Now, if we have an audio file, convert that too
+    musicfile = chart.metadata.get('music')
+    if musicfile is not None:
+        print('Converting audio...')
+        adpcm = ADPCM(musicfile)
+
+        twodx = TwoDX()
+        twodx.set_name('01_{num:04d}'.format(num=args.id))
+        twodx.write_file('01_{num:04d}_1.wav'.format(num=args.id), adpcm.get_adpcm_data())
+
+        fp = open(os.path.join(root, '01_{num:04d}.2dx'.format(num=args.id)), 'wb')
+        fp.write(twodx.get_new_data())
+        fp.close()
+
+    print('Done!')
 
     return 0
 

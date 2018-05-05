@@ -9,3 +9,4 @@ __pycache__
 *nov.xml
 .mypy_cache
 *.def
+*.2dx
