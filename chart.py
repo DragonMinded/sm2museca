@@ -410,7 +410,16 @@ class XML:
         # Return the chart data.
         return chart.toprettyxml(indent="  ").encode('ascii')
 
-    def get_metadata(self) -> bytes:
+    def __add_metadata_to_document(
+        self,
+        music_data: minidom.Document,
+    ) -> None:
+        # Find MDB node
+        mdb_nodes = music_data.getElementsByTagName('mdb')
+        if len(mdb_nodes) != 1:
+            raise Exception('Invalid XML file layout!')
+        mdb = mdb_nodes[0]
+
         # Grab info
         infodict = self.__chart.metadata
 
@@ -423,11 +432,6 @@ class XML:
         # Grab max and min BPM
         maxbpm = max([bpm for (_, bpm) in bpms])
         minbpm = min([bpm for (_, bpm) in bpms])
-
-        # Create root document
-        music_data = minidom.Document()
-        mdb = music_data.createElement('mdb')
-        music_data.appendChild(mdb)
 
         def element(parent: Any, name: str, value: Optional[str]=None) -> Any:
             element = music_data.createElement(name)
@@ -485,4 +489,49 @@ class XML:
             element(root, 'price', '-1').setAttribute('__type', 's32')
             element(root, 'limited', '1' if (diffval == 'infinite' or  details.get('rating', '0') == '0') else '3').setAttribute('__type', 'u8')
 
-        return music_data.toprettyxml(indent="  ", encoding='utf-8').replace(b'utf-8', b'shift-jis')
+    def get_metadata(self) -> bytes:
+        # Create root document
+        music_data = minidom.Document()
+        mdb = music_data.createElement('mdb')
+        music_data.appendChild(mdb)
+
+        # Add our info to the empty doc.
+        self.__add_metadata_to_document(music_data)
+
+        return music_data.toprettyxml(indent="  ", encoding='shift_jisx0213').replace(b'shift_jisx0213', b'shift-jis')
+
+    def update_metadata(self, old_data: bytes) -> bytes:
+        # Parse old root document, being sure to recognize the encoding lie
+        try:
+            datastr = old_data.decode('utf-8')
+            encoding = 'utf-8'
+        except UnicodeDecodeError:
+            try:
+                datastr = old_data.decode('shift_jisx0213')
+                encoding = 'shift_jisx0213'
+            except UnicodeDecodeError:
+                raise Exception('Unable to parse exising XML data!')
+
+        music_data = minidom.parseString(datastr)
+        mdb = music_data.createElement('mdb')
+
+        # First, find and delete any music entries matching our ID
+        for node in music_data.getElementsByTagName('music'):
+            idattr = node.attributes.get('id')
+            if idattr is not None:
+                idval = str(idattr.value)
+                if idval == str(self.__id):
+                    parent = node.parentNode
+                    parent.removeChild(node)
+
+        # Now, add our info to the updated doc
+        self.__add_metadata_to_document(music_data)
+
+        newdata = music_data.toprettyxml(indent="  ", encoding=encoding).replace(encoding.encode('ascii'), b'shift-jis')
+
+        # For some reason, minidom loves adding tons of whitespace, so lets
+        # hack it back out.
+        return b'\n'.join([
+            line for line in newdata.split(b'\n')
+            if len(line.strip()) > 0
+        ])

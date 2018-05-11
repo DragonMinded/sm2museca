@@ -29,6 +29,13 @@ def main() -> int:
         help="Directory to place files in. Defaults to current directory.",
         default='.',
     )
+    parser.add_argument(
+        "-x",
+        "--update-xml",
+        help="Location of music database XML file to update. If not specified, "
+             "a new one will be created containing just the data for this file.",
+        default=None,
+    )
 
     args = parser.parse_args()
     root = args.directory
@@ -49,10 +56,19 @@ def main() -> int:
 
     print('Outputting XML...')
 
-    # First, write out a metadata file, that can be copied into music-info.xml
-    fp = open(os.path.join(root, 'music-info.xml'), 'wb')
-    fp.write(xml.get_metadata())
-    fp.close()
+    if args.update_xml is not None:
+        # First, update the metadata file with the info from this chart.
+        fp = open(args.update_xml, "rb")
+        data = fp.read()
+        fp.close()
+        fp = open(args.update_xml, "wb")
+        fp.write(xml.update_metadata(data))
+        fp.close()
+    else:
+        # First, write out a metadata file, that can be copied into music-info.xml
+        fp = open(os.path.join(root, 'music-info.xml'), 'wb')
+        fp.write(xml.get_metadata())
+        fp.close()
 
     # Now, write out the chart data
     fp = open(os.path.join(root, '01_{num:04d}_nov.xml'.format(num=args.id)), 'wb')
