@@ -165,6 +165,7 @@ class ADPCM:
             with tempfile.NamedTemporaryFile(suffix='.wav') as cuttemp:
                 subprocess.call([
                     'sox',
+                    '-V1',
                     intemp.name,
                     cuttemp.name,
                     # SOX fade can act weird, so we add a buffer on both
