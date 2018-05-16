@@ -30,9 +30,9 @@ StepMania's github account has an excellent writeup on the .sm file format that 
 ## Required Header Tags
 
 * TITLE - The title of the song as it shows in-game. This can be any unicode characters, including english, kana or kanji.
-* TITLE_YOMIGANA - The title of the song as sounded out in katakana, with dakuten removed and in half-width. This is used for title sort. There are converters which take any english and give you the katakana, and converters that go from full-width to half-width katakana. Use them!
+* TITLE_YOMIGANA - The title of the song as sounded out in katakana, with dakuten and in half-width. This is used for title sort. There are converters which take any english and give you the katakana, and converters that go from full-width to half-width katakana. Use them!
 * ARTIST - The artist of the song as it shows in-game. This can be any unicode characters, including english, kana or kanji.
-* ARTIST_YOMIGANA - The artist of the song as sounded out in katakana, with dakuten removed and in half-width. This is used for artist sort. There are converters which take any english and give you the katakana, and converters that go from full-width to half-width katakana. Use them!
+* ARTIST_YOMIGANA - The artist of the song as sounded out in katakana, with dakuten and in half-width. This is used for artist sort. There are converters which take any english and give you the katakana, and converters that go from full-width to half-width katakana. Use them!
 * MUSIC - Path to an audio file to be converted. Use any format supported by ffmpeg.
 * SAMPLESTART - Number of seconds into the above music to start the preview. The converter will auto-fade in and convert to a preview song.
 * SAMPLELENGTH - Number of seconds after the start to continue playing the preview before cutting off. The game tends to use 10-second previews, so its wise to stick with that.
