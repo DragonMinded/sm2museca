@@ -31,7 +31,7 @@ class Chart:
         for difficulty in ['novice', 'advanced', 'exhaust']:
             if difficulty not in self.notes:
                 continue
-            self.events[difficulty] = self.__get_events(self.notes[difficulty])
+            self.events[difficulty] = self.__get_events(difficulty, self.notes[difficulty])
 
     def __get_metadata(self, data: bytes) -> Dict[str, str]:
         lines = data.decode('utf-8').replace('\r', '\n').split('\n')
@@ -115,7 +115,7 @@ class Chart:
 
         return sections
 
-    def __get_events(self, notedetails: Dict[str, Any]) -> Optional[List[Dict[str, int]]]:
+    def __get_events(self, difficulty: str, notedetails: Dict[str, Any]) -> Optional[List[Dict[str, int]]]:
         # Make sure we can parse the final measure
         if notedetails['data']:
             notedetails['data'].append((notedetails['data'][-1][0] + 1, ','))
@@ -138,6 +138,7 @@ class Chart:
         curmeasure = []  # type: List[Tuple[int, str]]
         events = []  # type: List[Dict[str, int]]
         pending_events = []  # type: List[Tuple[int, Dict[str, int]]]
+        grafica_toggles = 0
 
         # The time at the beginning of the measure, in milliseconds
         curtime = float(self.metadata.get('offset', '0.0')) * 1000.0
@@ -151,6 +152,9 @@ class Chart:
             }
 
         def parse_measure(curtime: float, measure: List[Tuple[int, str]]) -> float:
+            # Allow ourselves to reference the per-chart grafica state.
+            nonlocal grafica_toggles
+
             # First, get the BPM of this measure, and the divisor for the measure.
             bpm = get_cur_bpm(curtime)
             notes_per_measure = len(measure)
@@ -200,6 +204,7 @@ class Chart:
                     raise Exception('Invalid measure data on line {}!'.format(lineno))
 
                 measuredata = [d for d in measuredata if len(d) == 6]
+                seen_grafica = False
                 for mset in measuredata:
                     for lane in range(len(mset)):
                         val = mset[lane]
@@ -279,6 +284,31 @@ class Chart:
 
                             if not found:
                                 raise Exception('End spin note with no start spin found for lane {} on line {}!'.format(lane + 1, lineno))
+                        elif val == 'G':
+                            if seen_grafica:
+                                raise Exception('Multiple grafica start/end notes on line {}!'.format(lineno))
+                            if grafica_toggles >= 6:
+                                raise Exception('No more than three grafica sections are allowed, tried to add a 4th on line {}!'.format(lineno))
+                            if (grafica_toggles % 2) == 0:
+                                # Start event
+                                events.append(event(
+                                    Constants.EVENT_KIND_GRAFICA_SECTION_START,
+                                    Constants.EVENT_KIND_GRAFICA_SECTION_START,
+                                    curtime,
+                                    curtime,
+                                ))
+                            else:
+                                # End event
+                                events.append(event(
+                                    Constants.EVENT_KIND_GRAFICA_SECTION_END,
+                                    Constants.EVENT_KIND_GRAFICA_SECTION_END,
+                                    curtime,
+                                    curtime,
+                                ))
+
+                            grafica_toggles = grafica_toggles + 1
+                            seen_grafica = True
+
                         else:
                             raise Exception('Unknown note type {} for lane {} on line {}!'.format(val, lane + 1, lineno))
 
@@ -298,6 +328,9 @@ class Chart:
 
         for (lineno, evt) in pending_events:
             raise Exception('Note started on line {} for lane {} is missing end marker!'.format(lineno, evt['lane'] + 1))
+
+        if grafica_toggles < 6:
+            print('WARNING: Did no specify all three grafica sections for {} difficulty!'.format(difficulty), file=sys.stderr)
 
         # Events can be generated out of order, so lets sort them!
         events = sorted(

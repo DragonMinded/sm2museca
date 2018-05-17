@@ -21,8 +21,6 @@ While it is possible to also update the album art (both the jacket and the backg
 
 Note that the game supports time signatures other than 4/4 but the converter doesn't make any attempt to handle this. It also DOES technically support BPM changes, but no verification was done around this feature. The converter will probably let you put down illegal sequences, such as a small/large spinny boi on top of a regular note. The game engine may actually handle this, but there is no guarantee!
 
-The converter does not currently have support for placing the start and end gates for the three grafica sections that are present in every song. The game seems to handle this just fine, but it can look bizarre. It would be trivial to add this, however.
-
 # Chart Format
 
 StepMania's github account has an excellent writeup on the .sm file format that I've taken heavy inspiration (read: stolen) from. You can find [basic information here](https://github.com/stepmania/stepmania/wiki/sm). I'll assume familiarity with this format for the rest of the documentation.
@@ -63,6 +61,7 @@ Measure data is identical to the .sm format, where we support 4ths, 8ths, 12ths,
 * L - Left direction large spinny boi.
 * R - Right direction large spinny boi.
 * T - Large spin finish. This is the point in which a previously started large spinny boi's tornado will land.
+* G - Grafica gate. The game normally has three sections where a grafica's effects are used. Grafica gates are used to toggle being in a grafica effect section. Unlike the rest of the events, this can be placed on any lane.
 
 ## Example chart
 
