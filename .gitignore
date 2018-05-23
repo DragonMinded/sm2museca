@@ -10,3 +10,8 @@ __pycache__
 .mypy_cache
 *.def
 *.2dx
+*.dll
+*.exe
+*.mp3
+*.wav
+*.ogg
