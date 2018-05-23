@@ -47,7 +47,7 @@ Note that the game supports time signatures other than 4/4 but the converter doe
 ### More chart format
 Each chart begins with a `#NOTEDATA:;` line. The following tags after `#NOTEDATA:;` are used by the converter:
 - ``#STEPSTYPE`` - The only supported type is ``museca-single``.
-- ``#CREDIT`` - The author of the chart, AKA your handle. Not to be confused with the ``#CREDIT``. Note that this doesn't actually get displayed anywhere, and usually even tends to be "``dummy``"
+- ``#CREDIT`` - The author of the chart, AKA your handle. Not to be confused with the ``#CREDIT`` one level up in ``#NOTESDATA:;``. Note that this doesn't actually get displayed anywhere, and usually tends to be "``dummy``".
 - ``#DIFFICULTY`` - One of the following three supported difficulties: ``Easy``, ``Medium``, or ``Hard``.
 - ``#METER`` - The difficulty rating, as a value from 1-15 inclusive.
 - ``#NOTES`` - The actual note data, which will continue to be parsed until a line with only a  ``;`` on it is encountered.
