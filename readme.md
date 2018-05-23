@@ -1,19 +1,25 @@
 # MÚSECA Chart Converter
 
-This utility defines a chart format similar to the StepMania chart format, and includes a chart converter that can convert a set of charts and an audio file to a format recognized by MÚSECA. Additionally, it will generate metadata to copy-paste into the music database xml, or optionally update an xml file if provided. It is invoked similar to the following:
+This utility includes a chart converter that can convert a set of charts written in StepMania's .ssc file format and an audio file to a format recognized by MÚSECA. Additionally, it will generate metadata to copy-paste into the music database xml, or optionally update an xml file if provided. It is invoked similar to the following:
 
-    python3 sm2museca.py chart.mu 123
+    python3 ssc2museca.py chart.ssc 123
 
-In the above command, a chart for Novice, Advanced and Exhaust will be parsed out of ``chart.mu`` and metadata and a directory suitable for copying into MÚSECA's game data will be generated. The game will identify the entry as ID 123. Note that you will probably want to choose IDs that are not already taken in the music database xml unless you want to replace songs in the game instead of add songs to the game. By default, the converter will output the converted metadata, chart and audio files to the current directory. To specify a separate directory, use ``--directory some/dir``. To tell the converter to update an existing xml file instead of generating a copy-pastable chunk of xml, use ``--update-xml music-info.xml``.
+In the above command, a chart for Novice (Green), Advanced (Yellow), and Exhaust (Red) will be parsed out of ``chart.ssc`` and metadata and a directory suitable for copying into MÚSECA's game data will be generated. The game will identify the entry as ID 123. Note that you will probably want to choose IDs that are not already taken in the music database xml unless you want to replace songs in the game instead of add songs to the game. By default, the converter will output the converted metadata, chart and audio files to the current directory. To specify a separate directory, use ``--directory some/dir``. To tell the converter to update an existing xml file instead of generating a copy-pastable chunk of xml, use ``--update-xml music-info.xml``.
+
+## About This Fork
+
+This fork is designed to be used in conjunction with [https://github.com/theKeithD/sm2museca](a fork of StepMania 5.2 that adds a new ``museca-single`` game mode). This mode defines a 16-lane single player mode, rather than a 16-lane double play mode like the ones offered by ``bm`` and ``techno``.
+
+_(Binaries to be provided soon)_
 
 ## Dependencies
 
 The following dependencies are required to run this conversion software:
 
-* ffmpeg - Used to convert various audio formats to the ADPCM format required by MÚSECA.
-* sox - Used to create preview clips.
-* python3 - The script assumes python 3.5 or better to operate.
-* MÚSECA cabinet - Obviously you'll need to have access to one of these to test and play songs.
+- ffmpeg - Used to convert various audio formats to the ADPCM format required by MÚSECA.
+- sox - Used to create preview clips.
+- python3 - The script assumes python 3.5 or better to operate.
+- MÚSECA cabinet - Obviously you'll need to have access to one of these to test and play songs.
 
 ## Caveats
 
@@ -23,144 +29,251 @@ Note that the game supports time signatures other than 4/4 but the converter doe
 
 # Chart Format
 
-StepMania's github account has an excellent writeup on the .sm file format that I've taken heavy inspiration (read: stolen) from. You can find [basic information here](https://github.com/stepmania/stepmania/wiki/sm). I'll assume familiarity with this format for the rest of the documentation.
+## Header Tags
 
-## Required Header Tags
+* ``TITLE`` - The title of the song as it shows in-game. This can be any unicode characters, including english, kana or kanji.
+* ``TITLETRANSLIT`` - The title of the song as sounded out in katakana, with dakuten and in half-width. This is used for title sort. There are converters which take any english and give you the katakana, and converters that go from full-width to half-width katakana. Use them!
+* ``ARTIST`` - The artist of the song as it shows in-game. This can be any unicode characters, including english, kana or kanji.
+* ``ARTISTTRANSLIT`` - The artist of the song as sounded out in katakana, with dakuten and in half-width. This is used for artist sort. There are converters which take any english and give you the katakana, and converters that go from full-width to half-width katakana. Use them!
+* ``SUBTITLETRANSLIT`` - This maps to the ``ascii`` element in music-info.xml, and defaults to "``dummy``". Can (and should) be left blank.
+* ``MUSIC`` - Path to an audio file to be converted. Use any format supported by ffmpeg.
+* ``SAMPLESTART`` - Number of seconds into the above music to start the preview. The converter will auto-fade in and convert to a preview song.
+* ``SAMPLELENGTH`` - Number of seconds after the start to continue playing the preview before cutting off. The game tends to use 10-second previews, so its wise to stick with that.
+* ``OFFSET`` - Number of seconds to offset the chart relative to the start of the music. Use this to sync the game to the chart.
+* ``BPMS`` - What BPM the chart is at. For help on this field, please refer to [https://github.com/stepmania/stepmania/wiki/ssc](the .ssc format documentation). It is not a simple number, but instead a comma-separated list of timestamps in seconds paired to a BPM that the song uses at that point.
+* ``LICENSE`` - The license owner of the song. Can be left blank.
+* ``CREDIT`` - The illustration artist. Can be left blank.
 
-* TITLE - The title of the song as it shows in-game. This can be any unicode characters, including english, kana or kanji.
-* TITLE_YOMIGANA - The title of the song as sounded out in katakana, with dakuten and in half-width. This is used for title sort. There are converters which take any english and give you the katakana, and converters that go from full-width to half-width katakana. Use them!
-* ARTIST - The artist of the song as it shows in-game. This can be any unicode characters, including english, kana or kanji.
-* ARTIST_YOMIGANA - The artist of the song as sounded out in katakana, with dakuten and in half-width. This is used for artist sort. There are converters which take any english and give you the katakana, and converters that go from full-width to half-width katakana. Use them!
-* MUSIC - Path to an audio file to be converted. Use any format supported by ffmpeg.
-* SAMPLESTART - Number of seconds into the above music to start the preview. The converter will auto-fade in and convert to a preview song.
-* SAMPLELENGTH - Number of seconds after the start to continue playing the preview before cutting off. The game tends to use 10-second previews, so its wise to stick with that.
-* OFFSET - Number of seconds to offset the chart relative to the start of the music. Use this to sync the game to the chart.
-* BPMS - What BPM the chart is at. For help on this field, please refer to the SM writeup above. Its not a simple number, but instead a comma-separated list of timestamps in seconds paired to a BPM that the song uses at that point.
-* LICENSE - The license owner of the song. Can be left blank.
-* CREDIT - The illustration artist. Can be left blank.
+### More chart format
+Each chart begins with a `#NOTEDATA:;` line. The following tags after `#NOTEDATA:;` are used by the converter:
+- ``#STEPSTYPE`` - The only supported type is ``museca-single``.
+- ``#CREDIT`` - The author of the chart, AKA your handle. Not to be confused with the ``#CREDIT``
+- ``#DIFFICULTY`` - One of the following three supported difficulties: ``Easy``, ``Medium``, or ``Hard``.
+- ``#METER`` - The difficulty rating, as a value from 1-15 inclusive.
+- ``#NOTES`` - The actual note data, which will continue to be parsed until a line with only a  ``;`` on it is encountered.
 
-## Notes
 
-Exactly like the .sm format, the NOTES section includes information about the chart itself followed by measure data. Unlike the .sm format, there is no groove radar values entry because MÚSECA doesn't have a groove radar. The following is a description of the metadata that is required:
+## Lane Layout, Charting, and Design Notes
 
-* Chart type - The only supported type is ``museca-single``.
-* Description/author - The author of the chart, AKA your handle.
-* Difficulty - One of the following three supported difficulties: ``Novice``, ``Advanced``, or ``Exhaust``.
-* Numerical meter - The difficulty rating, as a value from 1-15 inclusive.
+There is 1 pedal lane, and then 3 channels of 5 lanes each.
 
-Measure data is identical to the .sm format, where we support 4ths, 8ths, 12ths, 16ths, etc. As a convenience, we also support whole note measures, usually used for having a whole measure of nothing. The position of the character indicates the lane, much like in .sm. Postion 1-5 are lanes 1-5 in game, and position 6 is the foot pedal. Clever readers will note that the .sm format doesn't support multiple events at the same time. This presents a problem if you want to have a hold note, and then add a spinny boi on the hold lift, as a lot of official charts do. As an extension of the format, you can add a second identical set of notes to the right of the first, separated by a space. The note values are slightly different than .sm as well, given that there's a lot more possible note types. They're documented below.
+    CH0 @ sm[0]:      pedal (note that in museca, this lane is actually on the far right at ``msc[5]``)
+    CH1 @ sm[1..5]:   taps and holds
+    CH2 @ sm[6..10]:  left spins
+    CH3 @ sm[11..15]: right spins
 
-* 0 - No note.
-* 1 - Normal note (a tap).
-* 2 - Hold start (start of a hold note). Note that this is the only valid entry that can go in the foot pedal lane.
-* 3 - Hold end (end of a hold note). Note that this is the only valid entry that can go in the foot pedal lane.
-* s - Spinny boi.
-* l - Left direction spinny boi.
-* r - Right direction spinny boi.
-* S - Large spinny boi start. In game, the tornado effect is controlled by placing a large spin end event when you want it to land.
-* L - Left direction large spinny boi.
-* R - Right direction large spinny boi.
-* T - Large spin finish. This is the point in which a previously started large spinny boi's tornado will land.
-* G - Grafica gate. The game normally has three sections where a grafica's effects are used. Grafica gates are used to toggle being in a grafica effect section. Unlike the rest of the events, this can be placed on any lane.
+### Mapping Examples
+- **Tap** in CH1, ``sm[1]``
+    - **Tap** in ``msc[1]``
+- **Hold** in CH1, ``sm[1]``
+    - **Hold** in ``msc[1]``
+- **Tap** in CH2, ``sm[6]``
+    - **Left spin** in ``msc[1]``
+- **Tap** in CH3, ``sm[11]``
+    - **Right spin** in ``msc[1]``
+- **Tap** in CH2 and CH3, ``sm[6] and sm[11]`` 
+    - **Non-directional spin** in ``msc[1]``
+- **Hold *start*** in CH2 or CH3, ``sm[6] or sm[11]``
+    - **Start storm object event** in ``msc[1]``
+- **Mine** in CH1 or CH2 or CH3, ``sm[1] or sm[6] or sm[11]``
+    - **End storm object event** in ``msc[1]``
+
+### Why 3 Channels?
+- Hold ends in StepMania don't have multiple end types, so we can't overlap a spinner of any kind onto a hold release.
+- More taps means more claps, which is always nice.
+    - An original 6-lane draft made use of all 4 note types: Tap, Mine (left spin), Fake (right spin), Lift (non-dir spin)
+    - But there were still hold ends and storm objects to worry about, thus...
+
+### Storm Objects: Why Hold Start, Why Mines?
+- Storm objects are "like" holds in that they have a start and end...
+    - ...but they do not claim exclusive control of the lane in MÚSECA.
+    - While a storm object is out, that lane could have taps and spins going on!
+- To still retain the assist tick sound while distinguishing these from normal spins, we make a hold, rather than a lift/fake.
+    - The timing of the hold end does not matter, the converter should ignore hold end events in CH2 or CH3.
+- The mine will indicate the storm is over, but it can go in any 5-lane channel, even CH1.
+    - This way, a storm object can end at the same time a spin of any kind occurs in that lane. (mine goes in CH1, taps go in CH2+CH3)
+- There's still one imperfect situation...
+
+### Case(s) Not Covered
+- Storm end event in ``msc[1]`` at the same time as a non-directional spin acting as the "tail" of a hold in ``msc[1]``. (or acting as the "head", but that's evil)
+    - Where does the mine go? CH1 is occupied by a hold, CH2 and CH3 are occupied by taps that will become a non-directional spin.
+    - Either shift something (preferably the mine/stormend) by 1/192nd...
+    - ...or maybe add a Label called "``STORM_END_LANE_n``" at this point, which will tell the converter to create a storm end event in lane ``n``.
+
+### TODO
+- Grafica gates are planned to be events within #LABELS.
+  1. This will require the converter to parse the #LABELS list.
+  2. And then perform some basic sanity checks. (START -> END -> START -> END -> START -> END)
+    - The label names will follow a pattern of ``GRAFICA_n_[START|END]``, where ``[n]`` is a value from 1-3 inclusive.
+  3. And then convert the beat numbers used into milliseconds.
+  4. And then push these to the events list.
 
 ## Example chart
 
-Below is an example chart, in which I show off the use of each different note type, as well as a few concurrent events.
+Below is an example chart, which includes a few measures showcasing a handful of events:
 
-    #TITLE:Call Me Maybe;
-    #TITLE_YOMIGANA:ｺｰﾙﾐｰﾒｰﾋﾞｰ;
-    #ARTIST:Carly Rae Jephsen;
-    #ARTIST_YOMIGANA:ｶｰﾘｰﾚｰｼﾞｪﾌｾﾝ;
-    #MUSIC:Carly Rae Jepsen - Call Me Maybe.mp3;
-    #SAMPLESTART: 28.500;
-    #SAMPLELENGTH: 10.000;
-    #OFFSET:0.000;
-    #BPMS:0.000=120.000;
-    #LICENSE:;
-    #CREDIT:DragonMinded;
-    #NOTES:
-        museca-single:
-        DragonMinded:
-        Novice:
-        5:
-    000000
-    ,
-    000000
-    ,
-    000000
-    ,
-    000000
-    ,
-    100000
-    010000
-    001000
-    000100
-    ,
-    000010 000002
-    000100
-    001000
-    010000
-    ,
-    100000 000003
-    000000
-    000000
-    000000
-    ,
-    101000
-    010100
-    001010
-    0l0l00
-    001010
-    010100
-    101000
-    0r0r00
-    ,
-    000000
-    ,
-    200000
-    000000
-    300020 s00000
-    000000
-    ,
-    000030 0000s0
-    000000
-    000000
-    000000
-    ,
-    00S000
-    ,
-    L0T0R0
-    000000
-    000000
-    000000
-    ,
-    T000T0
-    ,
-    000000
-    ,
-    000000
-    ,
-    000000
-    ,
-    000000
-    ,
-    000000
-    ,
-    000000
-    ,
-    000000
-    ,
-    000000
+    #VERSION:0.83;
+    #TITLE:双翼の独奏歌;
+    #ARTIST:ダークイルミネイト;
+    #TITLETRANSLIT:ｿｳﾖｸﾉｱﾘｱ;
+    #ARTISTTRANSLIT:ﾀﾞｰｸｲﾙﾐﾈｲﾄ;
+    #CREDIT:Bandai Namco Entertainment Inc.;
+    #BANNER:banner.jpg;
+    #BACKGROUND:end.jpg;
+    #DISCIMAGE:;
+    #MUSIC:aria.wav;
+    #OFFSET:0.000000;
+    #SAMPLESTART:72.680000;
+    #SAMPLELENGTH:13.083000;
+    #SELECTABLE:YES;
+    #BPMS:0.000=170.000;
+    #TIMESIGNATURES:0.000=4=4;
+    #TICKCOUNTS:0.000=4;
+    #COMBOS:0.000=1;
+    #SPEEDS:0.000=1.000=0.000=0;
+    #SCROLLS:0.000=1.000;
+    #LABELS:0.000=Song Start,
+    72.000=GRAFICA_1_START,
+    104.000=GRAFICA_1_END,
+    208.000=GRAFICA_2_START,
+    271.000=GRAFICA_2_END,
+    272.000=GRAFICA_3_START,
+    316.000=GRAFICA_3_END;
+    #BGCHANGES:0.000=-songbackground-=1.000=0=0=0=StretchNoLoop====,
+    99999=-nosongbg-=1.000=0=0=0 // don't automatically add -songbackground-
     ;
+
+
+    //---------------museca-single - ----------------
+    #NOTEDATA:;
+    #STEPSTYPE:museca-single;
+    #DIFFICULTY:Hard;
+    #METER:15;
+    #RADARVALUES:0.424903,1.104567,0.186425,0.194899,0.419456,351.000000,319.000000,22.000000,23.000000,6.000000,12.000000,0.000000,0.000000,0.000000,0.424903,1.104567,0.186425,0.194899,0.419456,351.000000,319.000000,22.000000,23.000000,6.000000,12.000000,0.000000,0.000000,0.000000;
+    #CREDIT:K;
     #NOTES:
-        museca-single:
-        DragonMinded:
-        Advanced:
-        10:
-    ;
-    #NOTES:
-        museca-single:
-        DragonMinded:
-        Exhaust:
-        15:
+    // measure 0
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    ,  // measure 1
+    2000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000010000200
+    0000000000000300
+    0000000000000000
+    0000000000000000
+    0000000100000010
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    ,  // measure 2
+    3100000000000M00
+    0001000000000000
+    0000010000000000
+    0000100000000000
+    0010000000000000
+    0000100000000000
+    0000010000000000
+    0001000000000000
+    0100000000000000
+    0010000000000000
+    0000100000000000
+    0010000000000000
+    0100000000000000
+    0001000000000000
+    0000010000000000
+    0000100000000000
+    ,  // measure 3
+    0010000000000000
+    0100000000000000
+    0001000000000000
+    0000010000000000
+    0000100000000000
+    0010000000000000
+    0000100000000000
+    0000010000000000
+    0001000000000000
+    0100000000000000
+    0010000000000000
+    0000100000000000
+    0010000000000000
+    0100000000000000
+    0001000000000000
+    0000010000000000
+    ,  // measure 4
+    0001000000000000
+    0010000000000000
+    0000100000000000
+    0100000000000000
+    0000010000000000
+    0100000000000000
+    0000100000000000
+    0010000000000000
+    0001000000000000
+    0000010000000000
+    0100000000000000
+    0010000000000000
+    0000100000000000
+    0000010000000000
+    0001000000000000
+    0010000000000000
+    ,  // measure 5
+    0100000000000000
+    0010000000000000
+    0001000000000000
+    0000100000000000
+    0000010000000000
+    0010000000000000
+    0000100000000000
+    0100000000000000
+    0001000000000000
+    0000100000000000
+    0000010000000000
+    0000100000000000
+    0001000000000000
+    0010000000000000
+    0000010000000000
+    0001000000000000
+
+    [--snip--]
+
+    ,  // measure 77
+    2200022000110002
+    3000003000000003
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    ,  // measure 78
+    0000000000000000
+    2000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    0000000000000000
+    ,  // measure 79
+    3300031000MM0001
+    0000000000000000
+    0000000000000000
+    0000000000000000
     ;
