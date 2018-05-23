@@ -8,13 +8,13 @@ In the above command, a chart for Novice (Green), Advanced (Yellow), and Exhaust
 
 ## About This Fork
 
-This fork is designed to be used in conjunction with [https://github.com/theKeithD/sm2museca](a fork of StepMania 5.2 that adds a new ``museca-single`` game mode). This mode defines a 16-lane single player mode, rather than a 16-lane double play mode like the ones offered by ``bm`` and ``techno``.
+This fork is designed to be used in conjunction with [a fork of StepMania 5.2 that adds a new ``museca-single`` game mode](https://github.com/theKeithD/sm2museca). This mode defines a 16-lane single player mode, rather than a 16-lane double play mode like the ones offered by ``bm`` and ``techno``. A noteskin is provided that helps better visualize the spin lanes on top of the normal lanes and should result in quicker and easier chart creation.
 
 _(Binaries to be provided soon)_
 
 ## Dependencies
 
-The following dependencies are required to run this conversion software:
+The following external dependencies are required to run this conversion software:
 
 - ffmpeg - Used to convert various audio formats to the ADPCM format required by MÚSECA.
 - sox - Used to create preview clips.
@@ -31,23 +31,23 @@ Note that the game supports time signatures other than 4/4 but the converter doe
 
 ## Header Tags
 
-* ``TITLE`` - The title of the song as it shows in-game. This can be any unicode characters, including english, kana or kanji.
-* ``TITLETRANSLIT`` - The title of the song as sounded out in katakana, with dakuten and in half-width. This is used for title sort. There are converters which take any english and give you the katakana, and converters that go from full-width to half-width katakana. Use them!
-* ``ARTIST`` - The artist of the song as it shows in-game. This can be any unicode characters, including english, kana or kanji.
-* ``ARTISTTRANSLIT`` - The artist of the song as sounded out in katakana, with dakuten and in half-width. This is used for artist sort. There are converters which take any english and give you the katakana, and converters that go from full-width to half-width katakana. Use them!
-* ``SUBTITLETRANSLIT`` - This maps to the ``ascii`` element in music-info.xml, and defaults to "``dummy``". Can (and should) be left blank.
+* ``TITLE`` - The title of the song as it shows in-game. This can include all sorts of characters, including english, kana or kanji. Various accented latin characters may not render correctly due to particulars about how the game handles certain character sets, though.
+* ``TITLETRANSLIT`` - The title of the song as sounded out, written in half-width katakana (dakuten allowed). This is used for title sort. There are converters which take any english and give you the katakana, and converters that go from full-width to half-width katakana. Use them!
+* ``ARTIST`` - The artist of the song as it shows in-game. This can include all sorts of characters, including english, kana or kanji. Various accented latin characters may not render correctly due to particulars about how the game handles certain character sets, though.
+* ``ARTISTTRANSLIT`` - The artist of the song as sounded out, written in half-width katakana (dakuten allowed). This is used for artist sort. There are converters which take any english and give you the katakana, and converters that go from full-width to half-width katakana. Use them!
+* ``SUBTITLETRANSLIT`` - Can (and should) be omitted. This maps to the ``ascii`` element in music-info.xml, and defaults to "``dummy``" if no value is provided.
 * ``MUSIC`` - Path to an audio file to be converted. Use any format supported by ffmpeg.
 * ``SAMPLESTART`` - Number of seconds into the above music to start the preview. The converter will auto-fade in and convert to a preview song.
-* ``SAMPLELENGTH`` - Number of seconds after the start to continue playing the preview before cutting off. The game tends to use 10-second previews, so its wise to stick with that.
+* ``SAMPLELENGTH`` - Number of seconds after the start to continue playing the preview before cutting off. The game tends to use 10-second previews, so it's wise to stick with that.
 * ``OFFSET`` - Number of seconds to offset the chart relative to the start of the music. Use this to sync the game to the chart.
-* ``BPMS`` - What BPM the chart is at. For help on this field, please refer to [https://github.com/stepmania/stepmania/wiki/ssc](the .ssc format documentation). It is not a simple number, but instead a comma-separated list of timestamps in seconds paired to a BPM that the song uses at that point.
+* ``BPMS`` - What BPM the chart is at. For help on this field, please refer to [the .ssc format documentation](https://github.com/stepmania/stepmania/wiki/ssc). It is not a simple number, but instead a comma-separated list of timestamps in seconds paired to a BPM that the song uses at that point.
 * ``LICENSE`` - The license owner of the song. Can be left blank.
 * ``CREDIT`` - The illustration artist. Can be left blank.
 
 ### More chart format
 Each chart begins with a `#NOTEDATA:;` line. The following tags after `#NOTEDATA:;` are used by the converter:
 - ``#STEPSTYPE`` - The only supported type is ``museca-single``.
-- ``#CREDIT`` - The author of the chart, AKA your handle. Not to be confused with the ``#CREDIT``
+- ``#CREDIT`` - The author of the chart, AKA your handle. Not to be confused with the ``#CREDIT``. Note that this doesn't actually get displayed anywhere, and usually even tends to be "``dummy``"
 - ``#DIFFICULTY`` - One of the following three supported difficulties: ``Easy``, ``Medium``, or ``Hard``.
 - ``#METER`` - The difficulty rating, as a value from 1-15 inclusive.
 - ``#NOTES`` - The actual note data, which will continue to be parsed until a line with only a  ``;`` on it is encountered.
@@ -104,7 +104,7 @@ There is 1 pedal lane, and then 3 channels of 5 lanes each.
 - Grafica gates are planned to be events within #LABELS.
   1. This will require the converter to parse the #LABELS list.
   2. And then perform some basic sanity checks. (START -> END -> START -> END -> START -> END)
-    - The label names will follow a pattern of ``GRAFICA_n_[START|END]``, where ``[n]`` is a value from 1-3 inclusive.
+    - The label names will follow a pattern of ``GRAFICA_n_[START|END]``, where ``n`` is a value from 1-3 inclusive.
   3. And then convert the beat numbers used into milliseconds.
   4. And then push these to the events list.
 
