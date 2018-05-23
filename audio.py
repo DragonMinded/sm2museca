@@ -121,7 +121,7 @@ class ADPCM:
 
         # We must create a temporary file, use ffmpeg to convert the file
         # to MS-ADPCM and then load those bytes in.
-        with tempfile.NamedTemporaryFile(suffix='.wav') as temp:
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp:
             subprocess.call([
                 'ffmpeg',
                 '-y',
@@ -140,6 +140,7 @@ class ADPCM:
 
             temp.seek(0)
             self.__full_data = temp.read()
+        os.remove(temp.name)
 
     def __conv_preview(self) -> None:
         self.__check_file()
@@ -148,7 +149,7 @@ class ADPCM:
 
         # We have to convert to .wav because SOX sometimes doesn't have
         # codecs for other formats, so we support everything ffmpeg does.
-        with tempfile.NamedTemporaryFile(suffix='.wav') as intemp:
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as intemp:
             subprocess.call([
                 'ffmpeg',
                 '-y',
@@ -162,7 +163,7 @@ class ADPCM:
             ])
 
             # Now, get sox to cut this up into a new file.
-            with tempfile.NamedTemporaryFile(suffix='.wav') as cuttemp:
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as cuttemp:
                 subprocess.call([
                     'sox',
                     '-V1',
@@ -184,7 +185,7 @@ class ADPCM:
                 ])
 
                 # Now, do the final conversion to ADPCM and load the data.
-                with tempfile.NamedTemporaryFile(suffix='.wav') as outtemp:
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as outtemp:
                     subprocess.call([
                         'ffmpeg',
                         '-y',
@@ -203,6 +204,9 @@ class ADPCM:
 
                     outtemp.seek(0)
                     self.__preview_data = outtemp.read()
+                os.remove(outtemp.name)
+            os.remove(cuttemp.name)
+        os.remove(intemp.name)
 
     def get_full_data(self) -> bytes:
         if self.__full_data is None:
