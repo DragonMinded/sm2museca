@@ -90,6 +90,17 @@ class Constants:
     MSC_SPIN_5 = [SM_LANE_5L, SM_LANE_5R]
     MSC_SPINS = [MSC_SPIN_1, MSC_SPIN_2, MSC_SPIN_3, MSC_SPIN_4, MSC_SPIN_5]
 
+    ### GRAFICA SECTIONS ###
+    # - there should one of each of these (in order!) in the #LABELS section
+    GRAFICA_LABELS = ['GRAFICA_1_START', 'GRAFICA_1_END',
+                      'GRAFICA_2_START', 'GRAFICA_2_END',
+                      'GRAFICA_3_START', 'GRAFICA_3_END']
+
+    ### ALTERNATIVE STORM END EVENTS (as labels) ###
+    # - for cases where all 3 channels are currently in use
+    # - that is to say: storm ending at the same time as a non-directional spin at the end (or start!) of a hold
+    # - TODO: this should be parsed per-chart, which requires support
+    #STORM_LABELS = ['STORM_END_LANE_1', 'STORM_END_LANE_2', 'STORM_END_LANE_3', 'STORM_END_LANE_4', 'STORM_END_LANE_5']
 
 # This works similarly to the original sm2museca chart class, except for the part
 # where it doesn't. This uses a custom game mode with a 16-lane game type,
@@ -103,10 +114,53 @@ class Chartv2:
         self.metadata = self.__get_metadata(data)
         self.notes = self.__get_notesections(data)
         self.events = {}  # type: Dict[str, List[Dict[str, int]]]
+        
+        if not self.metadata.get('bpms', {}):
+            self.metadata['bpms'] = self.notes.get('bpms', {})
+        if not self.metadata.get('labels', {}):
+            self.metadata['labels'] = self.notes.get('labels', {})
+        
         for difficulty in ['easy', 'medium', 'hard']:
             if difficulty not in self.notes:
                 continue
             self.events[difficulty] = self.__get_events(difficulty, self.notes[difficulty])
+
+    # TODO: assuming 4/4 all the way for now, revisit this when adding timesig support!
+    def beats_to_ms(self, target_beat: float) -> int:
+        def __single_section_ms(a: float, b: float) -> float:
+            return a / b * 60 * 1000
+
+        if len(self.bpms) == 1:
+            return int(__single_section_ms(target_beat, float(self.bpms[0][1])))
+        elif len(self.bpms) > 1:
+            total_ms = 0
+
+            # target beat is within first BPM section
+            if target_beat <= self.bpms[1][0]:
+                total_ms = __single_section_ms(target_beat, float(self.bpms[0][1]))
+            else:
+                delta = 0
+                beats_to_calc = 0
+                (prev_beat, prev_bpm) = self.bpms[0]
+
+                for i, (cur_beat, cur_bpm) in enumerate(self.bpms[1:], start=1):
+                    if cur_beat <= target_beat:
+                        beats_to_calc = min(cur_beat, target_beat) - prev_beat
+                    else:
+                        break
+
+                    delta = __single_section_ms(beats_to_calc, float(prev_bpm))
+                    total_ms += delta
+
+                    # we've gone past the end, and must keep counting
+                    if i == len(self.bpms[1:]) and target_beat > cur_beat:
+                        total_ms += __single_section_ms((target_beat - cur_beat), float(cur_bpm))
+
+
+                    prev_beat = cur_beat
+                    prev_bpm = cur_bpm
+
+            return int(total_ms) + int(float(self.metadata.get('offset', '0.0')) * 1000.0)
 
     def __get_metadata(self, data: bytes) -> Dict[str, str]:
         lines = data.decode('utf-8').replace('\r', '\n').split('\n')
@@ -125,6 +179,8 @@ class Chartv2:
     def __get_notesections(self, data: bytes) -> Dict[str, Dict[str, Any]]:
         def get_single_line_tag_val(line: str) -> str:
             return line.strip().split(':')[1][:-1]
+        def get_tag_val_pair(line: str) -> Dict[str, Dict[str, Any]]:
+            return line.strip()[:-1].split('=', 1)
 
         lines = data.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n').split('\n')
         lines.append('')
@@ -142,8 +198,17 @@ class Chartv2:
         # Whether we're in a section or not.
         section = False
 
+        # #NOTEDATA
+        notedata_section = False
+
         # Whether we're in the #NOTES section which contains the measures
         notes_section = False
+
+        # #BPMS
+        bpms_section = False
+        
+        # #LABELS
+        labels_section = False
 
         # Whether this section is actually a section we can safely ignore
         ignorable_section = False
@@ -158,16 +223,18 @@ class Chartv2:
         sectiondata = []  # type: List[Tuple[int, str]]
 
         for line in lines:
-            all_sections = ['#LABELS', '#BGCHANGES', '#NOTEDATA', '#NOTES']
+            all_sections = ['#BPMS', '#LABELS', '#BGCHANGES', '#NOTEDATA', '#NOTES']
 
             # ignore sections that start with these
-            other_sections = ['#LABELS', '#BGCHANGES']
+            other_sections = ['#BGCHANGES']
             for ignore_section in other_sections:
                 if line.startswith(ignore_section):
                     print('ignoring', ignore_section)
                     section = True
                     ignorable_section = True
-                    # other_sections.remove(ignore_section)
+                    cursection = {}
+                    sectiondata = []
+                    other_sections.remove(ignore_section)
 
             # See if we should start parsing a notedata section (metadata + notes)
             if line.strip() == '#NOTEDATA:;':
@@ -177,6 +244,31 @@ class Chartv2:
                         'Found unexpected NOTEDATA section on line {} inside existing section starting on line {}!'.format(lineno, sectionstart)
                     )
                 section = True
+                notedata_section = True
+                sectionstart = lineno
+                cursection = {}
+                sectiondata = []
+
+            elif line.strip().startswith('#BPMS'):
+                print("beginning #BPMS @", lineno)
+                if section and bpms_section:
+                    raise Exception(
+                        'Found unexpected BPMS section on line {} inside existing section starting on line {}!'.format(lineno, sectionstart)
+                    )
+                section = True
+                bpms_section = True
+                sectionstart = lineno
+                cursection = {}
+                sectiondata = []
+
+            elif line.strip().startswith('#LABELS'):
+                print("beginning #LABELS @", lineno)
+                if section and labels_section:
+                    raise Exception(
+                        'Found unexpected LABELS section on line {} inside existing section starting on line {}!'.format(lineno, sectionstart)
+                    )
+                section = True
+                labels_section = True
                 sectionstart = lineno
                 cursection = {}
                 sectiondata = []
@@ -187,9 +279,15 @@ class Chartv2:
                 # Filter out some garbage at least
                 if notes_section and \
                    not line.strip().startswith('//') and \
-                   not line.strip().startswith(';') and \
-                   not line.strip().startswith(','):
+                   not line.strip().startswith(';'):
                     sectiondata.append((lineno, line))
+                # We're a little less picky about #BPMS and #LABELS
+                elif bpms_section or labels_section:
+                    # except for the very first one
+                    if lineno == sectionstart:
+                        sectiondata.append((lineno, get_single_line_tag_val(line)))
+                    else:
+                        sectiondata.append((lineno, line.strip()[:-1]))
 
                 # abort parsing this section if it's not for museca
                 if line.strip().startswith('#STEPSTYPE'):
@@ -205,6 +303,14 @@ class Chartv2:
                 if line.strip().startswith('#NOTES'):
                     print("beginning #NOTES @", lineno, cursection)
                     notes_section = True
+                # # chart-specific #BPMS
+                # if line.strip().startswith('#BPMS'):
+                #     print("beginning #BPMS (chart-level) @", lineno, cursection)
+                #     bpms_section = True
+                # # chart-specific #LABELS
+                # if line.strip().startswith('#BPMS'):
+                #     print("beginning #LABELS (chart-level) @", lineno, cursection)
+                #     labels_section = True
 
             # See if we ended a section.
             if line.strip() == ';':
@@ -212,15 +318,34 @@ class Chartv2:
                     raise Exception(
                         'Found spurious end section on line {}!'.format(lineno)
                     )
+                else:
+                    print("ending section @", lineno, cursection)
+                    section = False
+                    ignorable_section = False
+                    if notes_section:
+                        notedata_section = False
+                        notes_section = False
+                        cursection['data'] = sectiondata
+                        if cursection.get('difficulty'):
+                            sections[cursection['difficulty'].lower()] = cursection
+            elif (bpms_section or labels_section) and line.strip().endswith(';'):
+                if not section and (bpms_section or labels_section):
+                    raise Exception(
+                        'Found spurious end section on line {}!'.format(lineno)
+                    )
+                else:
+                    section = False
+                    ignorable_section = False
+                    if bpms_section or labels_section:
+                        cursection = sectiondata
+                        print("ending section @", lineno, cursection)
 
-                print("ending section @", lineno, cursection)
-
-                section = False
-                notes_section = False
-                ignorable_section = False
-                cursection['data'] = sectiondata
-                if cursection.get('difficulty'):
-                    sections[cursection['difficulty'].lower()] = cursection
+                        if bpms_section:
+                            bpms_section = False
+                            sections['bpms'] = cursection
+                        elif labels_section:
+                            labels_section = False
+                            sections['labels'] = cursection
 
             lineno = lineno + 1
 
@@ -233,22 +358,21 @@ class Chartv2:
 
         # Parse out BPM, convert to milliseconds
         bpms = sorted(
-            [(ts * 1000.0, bpm) for (ts, bpm) in self.bpms],
+            [(self.beats_to_ms(beat), beat, bpm) for (beat, bpm) in self.bpms],
             key=lambda b: b[0]
         )
 
         # TODO: parse labels, we kinda need those for grafica sections again
         # Parse out labels, convert to milliseconds
-        # labels = sorted(
-        #     [(ts * 1000.0, label) for (ts, label) in self.labels],
-        #     key=lambda l: l[0]
-        # )
-        # print(labels)
+        labels = sorted(
+            [(self.beats_to_ms(beat), beat, label) for (beat, label) in self.labels],
+            key=lambda l: l[0]
+        )
 
         # Given a current time in milliseconds, return the BPM at the start of that
         # measure.
         def get_cur_bpm(cts: float) -> float:
-            for (ts, bpm) in bpms:
+            for (ts, beat, bpm) in bpms:
                 if cts >= ts:
                     return bpm
             raise Exception('Can\'t determine BPM!')
@@ -566,7 +690,7 @@ class Chartv2:
     @property
     def bpms(self) -> List[Tuple[float, float]]:
         bpms = []
-        for bpm in self.metadata.get('bpms', '').split(','):
+        for line, bpm in self.metadata.get('bpms', {}):
             if '=' not in bpm:
                 continue
             time_val, bpm_val = bpm.split('=', 1)
@@ -574,19 +698,25 @@ class Chartv2:
             bpmval = float(bpm_val)
             bpms.append((timeval, bpmval))
 
-        return bpms
+        return sorted(
+            [(beat, bpm) for (beat, bpm) in bpms],
+            key=lambda b: b[0]
+        )
 
-    # @property
-    # def labels(self) -> List[Tuple[float, str]]:
-    #     labels = []
-    #     for label in self.metadata.get('labels', '').split(','):
-    #         if '=' not in label:
-    #             continue
-    #         time_val, label_name = label.split('=', 1)
-    #         timeval = float(time_val)
-    #         labels.append((timeval, label_name))
+    @property
+    def labels(self) -> List[Tuple[float, str]]:
+        labels = []
+        for line, label in self.metadata.get('labels', {}):
+            if '=' not in label:
+                continue
+            time_val, label_text = label.split('=', 1)
+            timeval = float(time_val)
+            labels.append((timeval, label_text))
 
-    #     return labels
+        return sorted(
+            [(beat, label) for (beat, label) in labels],
+            key=lambda b: b[0]
+        )
 
 class XMLv2:
 
@@ -603,9 +733,10 @@ class XMLv2:
 
         # Parse out BPM, convert to milliseconds
         bpms = sorted(
-            [(ts * 1000.0, bpm) for (ts, bpm) in self.__chart.bpms],
+            [(beat, bpm) for (beat, bpm) in self.__chart.bpms],
             key=lambda b: b[0]
         )
+
 
         # Write out the chart
         chart = minidom.Document()
@@ -738,25 +869,25 @@ class XMLv2:
         element(info, 'version', '1').setAttribute('__type', 'u8')
         element(info, 'demo_pri', '-2').setAttribute('__type', 's8')
         element(info, 'world', '0').setAttribute('__type', 'u8')
-        element(info, 'tier', '-2').setAttribute('__type', 's8')
+        element(info, 'tier', '0').setAttribute('__type', 's8')
         element(info, 'license', infodict.get('license', ''))
         element(info, 'vmlink_phase', '0').setAttribute('__type', 's32')
         element(info, 'inf_ver', '0').setAttribute('__type', 'u8')
 
         # Create difficulties section
         difficulty = element(music, 'difficulty')
-        for diffval in ['easy', 'medium', 'hard', 'expert']:
-            root = element(difficulty, diffval)
-            if diffval != 'expert':
-                details = notedetails.get(diffval, {})
+        for (sm_diff, msc_diff) in [('easy', 'novice'), ('medium', 'advanced'), ('hard', 'exhaust'), ('expert', 'infinite')]:
+            root = element(difficulty, msc_diff)
+            if msc_diff != 'infinite':
+                details = notedetails.get(sm_diff, {})
             else:
                 details = {}  # type: Dict[str, str]
 
             element(root, 'difnum', details.get('rating', '0')).setAttribute('__type', 'u8')
-            element(root, 'illustrator', infodict.get('credit', ''))
-            element(root, 'effected_by', details.get('author', ''))
-            element(root, 'price', '-1').setAttribute('__type', 's32')
-            element(root, 'limited', '1' if (diffval == 'expert' or  details.get('rating', '0') == '0') else '3').setAttribute('__type', 'u8')
+            element(root, 'illustrator', infodict.get('credit', 'dummy'))
+            element(root, 'effected_by', details.get('author', 'dummy'))
+            element(root, 'price', '-2').setAttribute('__type', 's32')
+            element(root, 'limited', '2' if (sm_diff == 'expert' or  details.get('rating', '0') == '0') else '3').setAttribute('__type', 'u8')
 
     def get_metadata(self) -> bytes:
         # Create root document

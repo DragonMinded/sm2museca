@@ -40,11 +40,18 @@ Note that the game supports time signatures other than 4/4 but the converter doe
 * ``SAMPLESTART`` - Number of seconds into the above music to start the preview. The converter will auto-fade in and convert to a preview song.
 * ``SAMPLELENGTH`` - Number of seconds after the start to continue playing the preview before cutting off. The game tends to use 10-second previews, so it's wise to stick with that.
 * ``OFFSET`` - Number of seconds to offset the chart relative to the start of the music. Use this to sync the game to the chart.
-* ``BPMS`` - What BPM the chart is at. For help on this field, please refer to [the .ssc format documentation](https://github.com/stepmania/stepmania/wiki/ssc). It is not a simple number, but instead a comma-separated list of timestamps in seconds paired to a BPM that the song uses at that point.
+* ``BPMS`` - What BPM the chart is at. For help on this field, please refer to [the .ssc format documentation](https://github.com/stepmania/stepmania/wiki/ssc). It is not a simple number, but instead a comma-separated list of beat numbers paired to a BPM that the song uses at that point.
+* ``LABELS`` - These are used for declaring the beginnings and ends of Grafica sections. Similar to ``BPMS``, this is a comma-separated list of values ``beat_num=LABELTEXT``. The converter expects/requires 6 labels in this order:
+    * ``GRAFICA_1_START``
+    * ``GRAFICA_1_END``
+    * ``GRAFICA_2_START``
+    * ``GRAFICA_2_END``
+    * ``GRAFICA_3_START``
+    * ``GRAFICA_3_END``
 * ``LICENSE`` - The license owner of the song. Can be left blank.
 * ``CREDIT`` - The illustration artist. Can be left blank.
 
-### More chart format
+### Chart Tags
 Each chart begins with a `#NOTEDATA:;` line. The following tags after `#NOTEDATA:;` are used by the converter:
 - ``#STEPSTYPE`` - The only supported type is ``museca-single``.
 - ``#CREDIT`` - The author of the chart, AKA your handle. Not to be confused with the ``#CREDIT`` one level up in ``#NOTESDATA:;``. Note that this doesn't actually get displayed anywhere, and usually tends to be "``dummy``".
@@ -98,15 +105,22 @@ There is 1 pedal lane, and then 3 channels of 5 lanes each.
 - Storm end event in ``msc[1]`` at the same time as a non-directional spin acting as the "tail" of a hold in ``msc[1]``. (or acting as the "head", but that's evil)
     - Where does the mine go? CH1 is occupied by a hold, CH2 and CH3 are occupied by taps that will become a non-directional spin.
     - Either shift something (preferably the mine/stormend) by 1/192nd...
-    - ...or maybe add a Label called "``STORM_END_LANE_n``" at this point, which will tell the converter to create a storm end event in lane ``n``.
+    - ...or maybe add a Label that starts with  "``STORM_END_LANE_n_``" at this point, which will tell the converter to create a storm end event in lane ``n``. (more text is accepted after the trailing ``_`` to allow for multiples of these events to exist, since label names cannot be repeated)
 
 ### TODO
-- Grafica gates are planned to be events within #LABELS.
-  1. This will require the converter to parse the #LABELS list.
-  2. And then perform some basic sanity checks. (START -> END -> START -> END -> START -> END)
-    - The label names will follow a pattern of ``GRAFICA_n_[START|END]``, where ``n`` is a value from 1-3 inclusive.
-  3. And then convert the beat numbers used into milliseconds.
-  4. And then push these to the events list.
+- Chart-specific ``#BPMS`` and ``#LABELS``.
+    - This can be accomplished by using Step Timing mode instead of Song Timing mode in SM5.
+    - The parser will need to ignore many more sections while within ``#NOTEDATA``:
+        - #TIMESIGNATURESEGMENT
+        - #TICKCOUNTS
+        - #COMBOS
+        - #SPEEDS
+        - #SCROLLS
+    - Additionally, the parser will need to account for how multi-value lines are handled in ``#NOTEDATA`` .
+        - In ``#NOTEDATA``, each (potentially) multi-value tag gets a linebreak after each value.
+        - This means subsequent values start with ``\n,`` instead of ``,\n`` as it is elsewhere
+        - This also means the tag-ending ``;`` always appears on its own line, which differs from how the main song header keeps the final semi-colon on the same line for multi-value tags.
+    - Basically, this means reworking the parser quite a fair bit.
 
 ## Example chart
 
@@ -117,7 +131,7 @@ Below is an example chart, which includes a few measures showcasing a handful of
     #ARTIST:ダークイルミネイト;
     #TITLETRANSLIT:ｿｳﾖｸﾉｱﾘｱ;
     #ARTISTTRANSLIT:ﾀﾞｰｸｲﾙﾐﾈｲﾄ;
-    #CREDIT:Bandai Namco Entertainment Inc.;
+    #CREDIT:BANDAI NAMCO;
     #BANNER:banner.jpg;
     #BACKGROUND:end.jpg;
     #DISCIMAGE:;
