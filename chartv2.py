@@ -393,6 +393,31 @@ class Chartv2:
                 'end': int(end),
             }
 
+        # read (sorted) labels list and pick out relevant GRAFICA_ entries
+        def parse_grafica():
+            relevant_labels = [l for l in labels if l[2].startswith('GRAFICA_')]
+            if len(relevant_labels) < 6:
+                raise Exception('Not enough GRAFICA_ items found in #LABELS, need 6!');
+            for i, (time, beat, label) in enumerate(relevant_labels):
+                if label != Constants.GRAFICA_LABELS[i]:
+                    raise Exception(
+                        'Unexpected {} label found in #LABELS, was expecting {}.'.format(label, Constants.GRAFICA_LABELS[i])
+                    )
+                else:
+                    if i % 2 == 0:
+                        event_type = Constants.EVENT_KIND_GRAFICA_SECTION_START
+                    else:
+                        event_type = Constants.EVENT_KIND_GRAFICA_SECTION_END
+
+                    events.append(event(
+                        event_type,
+                        event_type,
+                        time,
+                        time
+                    ))
+
+        parse_grafica()
+
         def parse_measure(curtime: float, measure: List[Tuple[int, str]]) -> float:
             # First, get the BPM of this measure, and the divisor for the measure.
             bpm = get_cur_bpm(curtime)
