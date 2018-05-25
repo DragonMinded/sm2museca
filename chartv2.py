@@ -156,7 +156,6 @@ class Chartv2:
                     if i == len(self.bpms[1:]) and target_beat > cur_beat:
                         total_ms += __single_section_ms((target_beat - cur_beat), float(cur_bpm))
 
-
                     prev_beat = cur_beat
                     prev_bpm = cur_bpm
 
@@ -194,14 +193,13 @@ class Chartv2:
         # Data we're building up about the current section
         cursection = {}  # type: Dict[str, Any]
 
-
         # Whether we're in a section or not.
         section = False
 
         # #NOTEDATA
         notedata_section = False
 
-        # Whether we're in the #NOTES section which contains the measures
+        # Whether we're in the #NOTES section which contains the actual measures
         notes_section = False
 
         # #BPMS
@@ -466,9 +464,6 @@ class Chartv2:
                 if len(mset) > 0 and len(mset) != len(Constants.SM_LANES):
                     raise Exception('Invalid measure data on line {}!'.format(lineno))
 
-                # if a mine is found, ignore mines anywhere else on the line
-                storm_ended = False
-
                 ## TRULY WHERE IT BEGINS ##
                 ## ...and also truly where it needs to be refactored ##
                 for msc_lane, sm_lanes in enumerate(Constants.MSC_LANES):
@@ -480,6 +475,9 @@ class Chartv2:
 
                     # hold is ending, check pending_events and push an event
                     resolving_pending = False
+
+                    # if a mine is found, ignore mines anywhere else in this channel
+                    storm_ended = False
 
                     # note data for this channel: ['1', '0', '0']
                     # (or just a single ['0'] for pedal lane)
@@ -562,12 +560,12 @@ class Chartv2:
                                 pending_events.append((
                                 lineno,
                                 event(
-                                    event_type,
-                                    msc_lane,
-                                    curtime,
-                                    curtime,
-                                )
-                            ))
+                                        event_type,
+                                        msc_lane,
+                                        curtime,
+                                        curtime,
+                                    )
+                                ))
                             else: # both spin items are taps
                                 event_type = Constants.EVENT_KIND_SMALL_SPINNER
                                 events.append(event(
@@ -601,7 +599,7 @@ class Chartv2:
                                     ))
                                 elif spins[0] not in Constants.SM_NOTES:
                                     invalid_note_found = True
-                            elif spins[1] != Constants.SM_NOTE_NONE: # spin right
+                            if spins[1] != Constants.SM_NOTE_NONE: # spin right
                                 if spins[1] == Constants.SM_NOTE_TAP:
                                     event_type = Constants.EVENT_KIND_SMALL_SPINNER_RIGHT
                                     events.append(event(
@@ -886,8 +884,8 @@ class XMLv2:
         element(info, 'bpm_max', str(int(maxbpm * 100))).setAttribute('__type', 'u32')
         element(info, 'distribution_date', datetime.date.strftime(datetime.datetime.now(), "%Y%m%d")).setAttribute('__type', 'u32')  # type: ignore
 
-        # TODO: Figure out what some of these should be
-        element(info, 'volume', '75').setAttribute('__type', 'u16')
+        # TODO: Figure out what more of these should be (is_fixed???)
+        element(info, 'volume', '90').setAttribute('__type', 'u16')
         element(info, 'bg_no', '0').setAttribute('__type', 'u16')
         element(info, 'genre', '16').setAttribute('__type', 'u8')
         element(info, 'is_fixed', '1').setAttribute('__type', 'u8')
