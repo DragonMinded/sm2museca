@@ -10,7 +10,9 @@ In the above command, a chart for Novice (Green), Advanced (Yellow), and Exhaust
 
 This fork is designed to be used in conjunction with [a fork of StepMania 5.2 that adds a new ``museca-single`` game mode](https://github.com/theKeithD/stepmania-musecaeditor). This mode defines a 16-lane single player mode, rather than a 16-lane double play mode like the ones offered by ``bm`` and ``techno``. A noteskin is provided that helps better visualize the spin lanes on top of the normal lanes and should result in quicker and easier chart creation.
 
-_(Binaries to be provided soon)_
+Windows binaries for this StepMania 5.2 fork are available as a .zip or .exe installer:
+- **.zip**: https://ortlin.de/i/msc/StepMania-5.2-git-edbed30b62-win32.zip
+- **.exe installer**: https://ortlin.de/i/msc/StepMania-5.2-git-edbed30b62-win32.exe
 
 ## Dependencies
 
@@ -110,6 +112,7 @@ There is 1 pedal lane, and then 3 channels of 5 lanes each.
 ### TODO
 - Chart-specific ``#BPMS`` and ``#LABELS``.
     - This can be accomplished by using Step Timing mode instead of Song Timing mode in SM5.
+    - Right now, using Step Timing at all will break the converter.
     - The parser will need to ignore many more sections while within ``#NOTEDATA``:
         - #TIMESIGNATURESEGMENT
         - #TICKCOUNTS
@@ -121,24 +124,26 @@ There is 1 pedal lane, and then 3 channels of 5 lanes each.
         - This means subsequent values start with ``\n,`` instead of ``,\n`` as it is elsewhere
         - This also means the tag-ending ``;`` always appears on its own line, which differs from how the main song header keeps the final semi-colon on the same line for multi-value tags.
     - Basically, this means reworking the parser quite a fair bit.
+- Allow storm end events to also be pulled in from ``#LABELS``, which will remove a limitation in this chart format
+- Adjust output file locations to put chart/audio data in one folder, and music-info.xml in another folder?
 
 ## Example chart
 
 Below is an example chart, which includes a few measures showcasing a handful of events:
 
     #VERSION:0.83;
-    #TITLE:双翼の独奏歌;
-    #ARTIST:ダークイルミネイト;
-    #TITLETRANSLIT:ｿｳﾖｸﾉｱﾘｱ;
-    #ARTISTTRANSLIT:ﾀﾞｰｸｲﾙﾐﾈｲﾄ;
-    #CREDIT:BANDAI NAMCO;
+    #TITLE:Test Song;
+    #ARTIST:Test;
+    #TITLETRANSLIT:ﾃｽﾄｿﾝｸﾞｸ;
+    #ARTISTTRANSLIT:ﾃｽﾄ;
+    #CREDIT:ILLUSTRATOR;
     #BANNER:banner.jpg;
-    #BACKGROUND:end.jpg;
+    #BACKGROUND:bg.jpg;
     #DISCIMAGE:;
-    #MUSIC:aria.wav;
+    #MUSIC:test.wav;
     #OFFSET:0.000000;
     #SAMPLESTART:72.680000;
-    #SAMPLELENGTH:13.083000;
+    #SAMPLELENGTH:10.000000;
     #SELECTABLE:YES;
     #BPMS:0.000=170.000;
     #TIMESIGNATURES:0.000=4=4;
@@ -259,7 +264,7 @@ Below is an example chart, which includes a few measures showcasing a handful of
 
     [--snip--]
 
-    ,  // measure 77
+    ,  // measure 77 (this is 2 storm objects layered on top of 2 hold starts, don't do this!)
     2200022000110002
     3000003000000003
     0000000000000000
