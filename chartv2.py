@@ -163,7 +163,9 @@ class Chartv2:
 
     def __get_metadata(self, data: bytes) -> Dict[str, str]:
         lines = data.decode('utf-8').replace('\r', '\n').split('\n')
-        lines = [line[1:-1] for line in lines if line.startswith('#') and line.endswith(';')]
+        lines = [line[1:-1] for line in lines if line.startswith('#') and line.endswith(';') and \
+        # ignore tags that can potentially contain multiple values but only contain 1
+                 not (line.startswith('#BPMS') or line.startswith('#LABELS'))]
         lines = [line for line in lines if ':' in line]
 
         infodict = {}  # type: Dict[str, str]
