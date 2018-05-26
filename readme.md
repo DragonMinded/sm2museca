@@ -8,7 +8,7 @@ In the above command, a chart for Novice (Green), Advanced (Yellow), and Exhaust
 
 ## About This Fork
 
-This fork is designed to be used in conjunction with [a fork of StepMania 5.2 that adds a new ``museca-single`` game mode](https://github.com/theKeithD/sm2museca). This mode defines a 16-lane single player mode, rather than a 16-lane double play mode like the ones offered by ``bm`` and ``techno``. A noteskin is provided that helps better visualize the spin lanes on top of the normal lanes and should result in quicker and easier chart creation.
+This fork is designed to be used in conjunction with [a fork of StepMania 5.2 that adds a new ``museca-single`` game mode](https://github.com/theKeithD/stepmania-musecaeditor). This mode defines a 16-lane single player mode, rather than a 16-lane double play mode like the ones offered by ``bm`` and ``techno``. A noteskin is provided that helps better visualize the spin lanes on top of the normal lanes and should result in quicker and easier chart creation.
 
 _(Binaries to be provided soon)_
 
