@@ -6,8 +6,9 @@ import sys
 from typing import Dict, Any, List, Tuple, Optional
 from xml.dom import minidom  # type: ignore
 
-from chart import Chart, XML
 from audio import TwoDX, ADPCM
+from chart import MUChart
+from document import XML
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="A utility to convert StepMania-like charts to Museca format.")
@@ -51,7 +52,7 @@ def main() -> int:
     print('Parsing chart data...')
 
     # First, parse out the chart and get the XML writer ready.
-    chart = Chart(data)
+    chart = MUChart(data)
     xml = XML(chart, args.id)
 
     print('Outputting XML...')
