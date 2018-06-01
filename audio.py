@@ -4,9 +4,6 @@ import subprocess
 from typing import Dict, List, Tuple, Optional
 
 
-from misc import TempFile, read_file
-
-
 class TwoDX:
     def __init__(self, data: Optional[bytes] = None) -> None:
         self.__name = None  # type: Optional[str]
