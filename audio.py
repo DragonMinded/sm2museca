@@ -26,7 +26,7 @@ class TwoDX:
         fileno = 1
 
         for offset in fileoffsets:
-            (magic, headerSize, wavSize, _, track, _, attenuation, loop) = struct.unpack(
+            (magic, headerSize, wavSize, _, _track, _, _attenuation, _loop) = struct.unpack(
                 '<4sIIhhhhi',
                 data[offset:(offset+24)],
             )
