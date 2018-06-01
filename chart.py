@@ -6,17 +6,10 @@ from misc import Constants
 
 
 class Chart:
-    metadata = {}  # type: Dict[str, str]
-    notes = {}  # type: Dict[str, Dict[str, Any]]
-    events = {}  # type: Dict[str, List[Dict[str, int]]]
-    bpms = []  # type: List[Tuple[float, float]]
-
-
-class MUChart(Chart):
 
     def __init__(self, data: bytes) -> None:
-        self.metadata = self.__get_metadata(data)
-        self.notes = self.__get_notesections(data)
+        self.metadata = self.__get_metadata(data)  # type: Dict[str, str]
+        self.notes = self.__get_notesections(data)  # type: Dict[str, Dict[str, Any]]
 
         # Calculate BPM info up front instead of every time it is requested
         bpms = []
@@ -27,7 +20,7 @@ class MUChart(Chart):
             timeval = float(time_val)
             bpmval = float(bpm_val)
             bpms.append((timeval, bpmval))
-        self.bpms = bpms
+        self.bpms = bpms  # type: List[Tuple[float, float]]
 
         # Calculate events up front
         self.events = {}  # type: Dict[str, List[Dict[str, int]]]

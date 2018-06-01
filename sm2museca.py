@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Tuple, Optional
 from xml.dom import minidom  # type: ignore
 
 from audio import TwoDX, ADPCM
-from chart import MUChart
+from chart import Chart
 from document import XML
 
 def main() -> int:
@@ -52,7 +52,7 @@ def main() -> int:
     print('Parsing chart data...')
 
     # First, parse out the chart and get the XML writer ready.
-    chart = MUChart(data)
+    chart = Chart(data)
     xml = XML(chart, args.id)
 
     print('Outputting XML...')
