@@ -121,26 +121,26 @@ class ADPCM:
         if self.__full_data is not None:
             raise Exception('Logic error, re-converting audio file!')
 
-        # We must create a temporary file, use ffmpeg to convert the file
-        # to MS-ADPCM and then load those bytes in.
-        with TempFile(suffix='.wav') as temp:
-            subprocess.call([
-                'ffmpeg',
-                '-y',
-                '-hide_banner',
-                '-nostats',
-                '-loglevel',
-                'quiet',
-                '-i',
-                self.__filename,
-                '-acodec',
-                'adpcm_ms',
-                '-ar',
-                '44100',
-                temp,
-            ])
+        ffmpeg_args = (
+            'ffmpeg',
+            '-y',
+            '-hide_banner',
+            '-nostats',
+            '-loglevel',
+            'quiet',
+            '-i',
+            self.__filename,
+            '-acodec',
+            'adpcm_ms',
+            '-ar',
+            '44100',
+            '-f',
+            'wav',
+            '-',  # Output to stdout
+        )
 
-            self.__full_data = read_file(temp)
+        finished_process = subprocess.run(ffmpeg_args, check=True, stdout=subprocess.PIPE)
+        self.__full_data = finished_process.stdout
 
     def __conv_preview(self) -> None:
         self.__check_file()
@@ -149,60 +149,71 @@ class ADPCM:
 
         # We have to convert to .wav because SOX sometimes doesn't have
         # codecs for other formats, so we support everything ffmpeg does.
-        with TempFile(suffix='.wav') as intemp:
-            subprocess.call([
-                'ffmpeg',
-                '-y',
-                '-hide_banner',
-                '-nostats',
-                '-loglevel',
-                'quiet',
-                '-i',
-                self.__filename,
-                intemp,
-            ])
+        pre_ffmpeg_args = (
+            'ffmpeg',
+            '-y',
+            '-hide_banner',
+            '-nostats',
+            '-loglevel',
+            'quiet',
+            '-i',
+            self.__filename,
+            '-f',
+            'wav',
+            '-',  # Output to stdout
+        )
 
-            # Now, get sox to cut this up into a new file.
-            with TempFile(suffix='.wav') as cuttemp:
-                subprocess.call([
-                    'sox',
-                    '-V1',
-                    intemp,
-                    cuttemp,
-                    # SOX fade can act weird, so we add a buffer on both
-                    # sides and fade into that.
-                    'trim',
-                    str(self.__preview_offset - self.FADE_LENGTH),
-                    str(self.__preview_length + self.FADE_LENGTH),
-                    'fade',
-                    str(self.FADE_LENGTH * 2.0),
-                    str(self.__preview_length + self.FADE_LENGTH),
-                    str(self.FADE_LENGTH),
-                    # Now, we trim after the fade to get a better preview.
-                    'trim',
-                    str(self.FADE_LENGTH),
-                    str(self.__preview_length),
-                ])
+        # Now, get sox to cut this up into a new file.
+        sox_args = (
+            'sox',
+            '-V1',
+            '-t',
+            '.wav',
+            '-',  # Read from stdin
+            '-t',
+            '.wav',
+            '-',  # Output to stdout
+            # SOX fade can act weird, so we add a buffer on both
+            # sides and fade into that.
+            'trim',
+            str(self.__preview_offset - self.FADE_LENGTH),
+            str(self.__preview_length + self.FADE_LENGTH),
+            'fade',
+            str(self.FADE_LENGTH * 2.0),
+            str(self.__preview_length + self.FADE_LENGTH),
+            str(self.FADE_LENGTH),
+            # Now, we trim after the fade to get a better preview.
+            'trim',
+            str(self.FADE_LENGTH),
+            str(self.__preview_length),
+        )
 
-                # Now, do the final conversion to ADPCM and load the data.
-                with TempFile(suffix='.wav') as outtemp:
-                    subprocess.call([
-                        'ffmpeg',
-                        '-y',
-                        '-hide_banner',
-                        '-nostats',
-                        '-loglevel',
-                        'quiet',
-                        '-i',
-                        cuttemp,
-                        '-acodec',
-                        'adpcm_ms',
-                        '-ar',
-                        '44100',
-                        outtemp,
-                    ])
+        # Now, do the final conversion to ADPCM.
+        post_ffmpeg_args = (
+            'ffmpeg',
+            '-y',
+            '-hide_banner',
+            '-nostats',
+            '-loglevel',
+            'quiet',
+            '-i',
+            '-',
+            '-acodec',
+            'adpcm_ms',
+            '-ar',
+            '44100',
+            '-f',
+            'wav',
+            '-',
+        )
 
-                    self.__preview_data = read_file(outtemp)
+        finished_process = None
+        input_binary = None
+        for args in (pre_ffmpeg_args, sox_args, post_ffmpeg_args):
+            finished_process = subprocess.run(args, check=True, stdout=subprocess.PIPE, input=input_binary)
+            input_binary = finished_process.stdout
+
+        self.__preview_data = finished_process.stdout
 
     def get_full_data(self) -> bytes:
         if self.__full_data is None:
