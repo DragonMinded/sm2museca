@@ -168,7 +168,7 @@ class XML:
             if diffval != 'infinite':
                 details = notedetails.get(diffval, {})
             else:
-                detauls = {}  # type: Dict[str, str]
+                details = {}  # type: Dict[str, str]
 
             element(root, 'difnum', details.get('rating', '0')).setAttribute('__type', 'u8')
             element(root, 'illustrator', infodict.get('credit'))
@@ -200,7 +200,7 @@ class XML:
                 raise Exception('Unable to parse exising XML data!')
 
         music_data = minidom.parseString(datastr)
-        mdb = music_data.createElement('mdb')
+        _mdb = music_data.createElement('mdb')
 
         # First, find and delete any music entries matching our ID
         for node in music_data.getElementsByTagName('music'):
