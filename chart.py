@@ -36,7 +36,8 @@ class MUChart(Chart):
                 continue
             self.events[difficulty] = self.__get_events(difficulty, self.notes[difficulty])
 
-    def __get_metadata(self, data: bytes) -> Dict[str, str]:
+    @staticmethod
+    def __get_metadata(data: bytes) -> Dict[str, str]:
         lines = data.decode('utf-8').replace('\r', '\n').split('\n')
         lines = [line[1:-1] for line in lines if line.startswith('#') and line.endswith(';')]
         lines = [line for line in lines if ':' in line]
@@ -48,12 +49,10 @@ class MUChart(Chart):
 
         return infodict
 
-    def __get_notesections(self, data: bytes) -> Dict[str, Dict[str, Any]]:
+    @staticmethod
+    def __get_notesections(data: bytes) -> Dict[str, Dict[str, Any]]:
         lines = data.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n').split('\n')
         lines.append('')
-
-        # Line number for error reasons
-        lineno = 1
 
         # All finished parsed sections
         sections = {}  # type: Dict[str, Dict[str, Any]]
@@ -76,7 +75,8 @@ class MUChart(Chart):
         # The measure data for the current section.
         sectiondata = []  # type: List[Tuple[int, str]]
 
-        for line in lines:
+        # Line number for error reasons
+        for lineno, line in enumerate(lines, start=1):
             # See if we should start parsing a notes section
             if line == '#NOTES:':
                 if section:
@@ -113,8 +113,6 @@ class MUChart(Chart):
             # Either measure data or garbage we care nothing about
             elif section:
                 sectiondata.append((lineno, line))
-
-            lineno = lineno + 1
 
         return sections
 
@@ -330,10 +328,10 @@ class MUChart(Chart):
                 curmeasure.append((lineno, line))
 
         for (lineno, evt) in pending_events:
-            raise Exception('Note started on line {} for lane {} is missing end marker!'.format(lineno, evt['lane'] + 1))
+            raise Exception('Note beginning on line {} for lane {} is missing end marker!'.format(lineno, evt['lane'] + 1))
 
         if grafica_toggles < 6:
-            print('WARNING: Did no specify all three grafica sections for {} difficulty!'.format(difficulty), file=sys.stderr)
+            print('WARNING: Did not specify all three grafica sections for {} difficulty!'.format(difficulty), file=sys.stderr)
 
         # Events can be generated out of order, so lets sort them!
         events = sorted(
