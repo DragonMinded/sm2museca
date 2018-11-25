@@ -40,7 +40,7 @@ class TwoDX:
             fileno = fileno + 1
 
     @property
-    def name(self) -> str:
+    def name(self) -> Optional[str]:
         return self.__name
 
     def set_name(self, name: str) -> None:
@@ -207,19 +207,27 @@ class ADPCM:
         finished_process = None
         input_binary = None
         for args in (pre_ffmpeg_args, sox_args, post_ffmpeg_args):
-            finished_process = subprocess.run(args, check=True, stdout=subprocess.PIPE, input=input_binary)
+            finished_process = subprocess.run(args, check=True, stdout=subprocess.PIPE, input=input_binary)  # type: ignore
+            if finished_process is None:
+                raise Exception('Conversion process for "' + ' '.join(args) + '" failed!')
             input_binary = finished_process.stdout
 
+        if finished_process is None:
+            raise Exception('Failed to load final data during conversion!')
         self.__preview_data = finished_process.stdout
 
     def get_full_data(self) -> bytes:
         if self.__full_data is None:
             self.__conv_file()
+        if self.__full_data is None:
+            raise Exception('Could not convert full song to ADPCM wav!')
 
         return self.__full_data
 
     def get_preview_data(self) -> bytes:
         if self.__preview_data is None:
             self.__conv_preview()
+        if self.__preview_data is None:
+            raise Exception('Could not convert preview to ADPCM wav!')
 
         return self.__preview_data

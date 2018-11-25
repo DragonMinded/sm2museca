@@ -116,7 +116,7 @@ class MUChart(Chart):
 
         return sections
 
-    def __get_events(self, difficulty: str, notedetails: Dict[str, Any]) -> Optional[List[Dict[str, int]]]:
+    def __get_events(self, difficulty: str, notedetails: Dict[str, Any]) -> List[Dict[str, int]]:
         # Make sure we can parse the final measure
         if notedetails['data']:
             notedetails['data'].append((notedetails['data'][-1][0] + 1, ','))

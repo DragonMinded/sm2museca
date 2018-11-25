@@ -165,14 +165,11 @@ class XML:
         difficulty = element(music, 'difficulty')
         for diffval in ['novice', 'advanced', 'exhaust', 'infinite']:
             root = element(difficulty, diffval)
-            if diffval != 'infinite':
-                details = notedetails.get(diffval, {})
-            else:
-                details = {}  # type: Dict[str, str]
+            details = notedetails.get(diffval, {}) if diffval != 'infinite' else {}  # type: Dict[str, Any]
 
-            element(root, 'difnum', details.get('rating', '0')).setAttribute('__type', 'u8')
+            element(root, 'difnum', str(details.get('rating', '0'))).setAttribute('__type', 'u8')
             element(root, 'illustrator', infodict.get('credit'))
-            element(root, 'effected_by', details.get('author'))
+            element(root, 'effected_by', str(details.get('author')))
             element(root, 'price', '-1').setAttribute('__type', 's32')
             element(root, 'limited', '1' if (diffval == 'infinite' or details.get('rating', '0') == '0') else '3').setAttribute('__type', 'u8')
 
