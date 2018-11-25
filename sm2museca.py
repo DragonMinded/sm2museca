@@ -10,6 +10,7 @@ from audio import TwoDX, ADPCM
 from chart import MUChart
 from document import XML
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="A utility to convert StepMania-like charts to Museca format.")
     parser.add_argument(

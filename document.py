@@ -174,7 +174,7 @@ class XML:
             element(root, 'illustrator', infodict.get('credit'))
             element(root, 'effected_by', details.get('author'))
             element(root, 'price', '-1').setAttribute('__type', 's32')
-            element(root, 'limited', '1' if (diffval == 'infinite' or  details.get('rating', '0') == '0') else '3').setAttribute('__type', 'u8')
+            element(root, 'limited', '1' if (diffval == 'infinite' or details.get('rating', '0') == '0') else '3').setAttribute('__type', 'u8')
 
     def get_metadata(self) -> bytes:
         # Create root document
@@ -200,7 +200,7 @@ class XML:
                 raise Exception('Unable to parse exising XML data!')
 
         music_data = minidom.parseString(datastr)
-        _mdb = music_data.createElement('mdb')
+        music_data.createElement('mdb')
 
         # First, find and delete any music entries matching our ID
         for node in music_data.getElementsByTagName('music'):

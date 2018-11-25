@@ -161,7 +161,7 @@ class MUChart(Chart):
             notes_per_measure = len(measure)
 
             # Measures are 4/4 time, so figure out what one measure costs time-wise
-            seconds_per_beat = 60.0/bpm
+            seconds_per_beat = 60.0 / bpm
             seconds_per_measure = seconds_per_beat * 4.0
 
             # Now, scale so we know how many seconds are taken up per tick in this

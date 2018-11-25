@@ -25,7 +25,7 @@ class TwoDX:
         for offset in fileoffsets:
             (magic, headerSize, wavSize, _, _track, _, _attenuation, _loop) = struct.unpack(
                 '<4sIIhhhhi',
-                data[offset:(offset+24)],
+                data[offset:(offset + 24)],
             )
 
             if magic != b'2DX9':
